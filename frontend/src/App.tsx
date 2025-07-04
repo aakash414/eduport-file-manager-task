@@ -1,10 +1,23 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthPage from './Pages/auth/AuthPage';
-import HomePage from './Pages/Home/page';
+import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import api from './services/api';
 import './App.css';
 
 function App() {
+    useEffect(() => {
+        const getCsrfToken = async () => {
+            try {
+                await api.get('/users/csrf/');
+            } catch (error) {
+                console.error('Failed to fetch CSRF token:', error);
+            }
+        };
+        getCsrfToken();
+    }, []);
+
     return (
         <div className="App">
             <header className="App-header">
@@ -14,9 +27,9 @@ function App() {
                 <Routes>
                     <Route path="/login" element={<AuthPage />} />
                     <Route path="/register" element={<AuthPage />} />
-                    <Route path="/home" element={
+                    <Route path="/dashboard" element={
                         <ProtectedRoute>
-                            <HomePage />
+                            <Dashboard />
                         </ProtectedRoute>
                     } />
                     <Route path="*" element={<Navigate to="/login" />} />

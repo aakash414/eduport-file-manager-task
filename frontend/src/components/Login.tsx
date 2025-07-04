@@ -18,7 +18,7 @@ const Login: React.FC = () => {
             }, {
                 withCredentials: true
             });
-            navigate('/home');
+            navigate('/dashboard');
         } catch (err) {
             const error = err as AxiosError<{ error: string }>;
             if (error.response && error.response.data) {
