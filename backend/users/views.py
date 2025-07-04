@@ -3,6 +3,8 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework import generics, status, views
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.utils.decorators import method_decorator
 from .serializers import UserSerializer
 
 class RegisterView(views.APIView):
@@ -66,3 +68,11 @@ class UserView(views.APIView):
 
     def get(self, request, *args, **kwargs):
         return Response(UserSerializer(request.user).data)
+
+
+@method_decorator(ensure_csrf_cookie, name='dispatch')
+class CSRFTokenView(views.APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        return Response({'message': 'CSRF cookie set'}, status=status.HTTP_200_OK)
