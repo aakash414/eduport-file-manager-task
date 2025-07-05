@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
-import axios, { AxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import apiClient from '../api/axios';
+import { AxiosError } from 'axios';
 
 const Login: React.FC = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         try {
-            await axios.post('http://localhost:8000/api/users/login/', {
+            const response = await apiClient.post('/users/login/', {
                 username,
                 password,
-            }, {
-                withCredentials: true
             });
+            login(response.data);
             navigate('/dashboard');
         } catch (err) {
             const error = err as AxiosError<{ error: string }>;
@@ -40,7 +42,7 @@ const Login: React.FC = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username"
                 required
-                className='border border-gray-300 rounded-md p-2 bg-gray-950'
+                className='border border-gray-300 rounded-md p-2 bg-gray-150'
             />
             <input
                 type="password"
@@ -48,9 +50,9 @@ const Login: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 required
-                className='border border-gray-300 rounded-md p-2 bg-gray-950'
+                className='border border-gray-300 rounded-md p-2 bg-gray-150'
             />
-            <button type="submit">Login</button>
+            <button type="submit" className='bg-blue-500 text-white p-2 rounded-md'>Login</button>
         </form>
     );
 };

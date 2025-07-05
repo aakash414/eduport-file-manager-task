@@ -49,7 +49,7 @@ const Register: React.FC = () => {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username"
                 required
-                className='border border-gray-300 rounded-md p-2 bg-gray-950'
+                className='border border-gray-300 rounded-md p-2 bg-gray-150'
             />
             {errors.username && <p className="text-red-500">{errors.username.join(', ')}</p>}
             <input
@@ -58,7 +58,7 @@ const Register: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
                 required
-                className='border border-gray-300 rounded-md p-2 bg-gray-950'
+                className='border border-gray-300 rounded-md p-2 bg-gray-150'
             />
             {errors.email && <p className="text-red-500">{errors.email.join(', ')}</p>}
             <input
@@ -67,7 +67,7 @@ const Register: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 required
-                className='border border-gray-300 rounded-md p-2 bg-gray-950'
+                className='border border-gray-300 rounded-md p-2 bg-gray-150'
             />
             {errors.password && <p className="text-red-500">{errors.password.join(', ')}</p>}
             <button type="submit">Register</button>
