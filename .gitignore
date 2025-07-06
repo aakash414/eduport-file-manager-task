@@ -1,2 +1,4 @@
 .env
-GEMINI.mdbackend/staticfiles/
+GEMINI.md
+backend/staticfiles/
+backend/mediafiles/
