@@ -1,21 +1,21 @@
-// src/pages/Dashboard.tsx
 import React from 'react';
 import FileUpload from '../components/files/FileUpload';
-import FileList from '../components/files/FileList';
+import { FileList } from '../components/files/FileList';
 import { FileProvider } from '../contexts/FileContext';
 
 const Dashboard: React.FC = () => {
     return (
         <FileProvider>
-            <div className="container mx-auto p-4">
-                <h1 className="text-2xl font-bold mb-4">File Dashboard</h1>
-                <div className="mb-8">
-                    <h2 className="text-xl font-semibold mb-2">Upload New File</h2>
-                    <FileUpload />
-                </div>
-                <div>
-                    <h2 className="text-xl font-semibold mb-2">My Files</h2>
-                    <FileList />
+            <div className="p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    {/* Left Column: File Upload */}
+                    <div className="lg:col-span-1">
+                        <FileUpload />
+                    </div>
+                    {/* Right Column: File List */}
+                    <div className="lg:col-span-2">
+                        <FileList />
+                    </div>
                 </div>
             </div>
         </FileProvider>

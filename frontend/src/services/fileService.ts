@@ -1,6 +1,7 @@
 // src/services/fileService.ts
 import api from './api';
-import type { FileUpload, FileShareLink, PaginatedResponse } from '../utils/types.ts';
+import type { FileUpload, PaginatedResponse, SearchParams } from '../utils/types.ts';
+import qs from 'qs';
 
 export const getFiles = async (page = 1, pageSize = 10, search = '') => {
     const response = await api.get<PaginatedResponse<FileUpload>>('/files/', {
@@ -13,11 +14,21 @@ export const getFiles = async (page = 1, pageSize = 10, search = '') => {
     return response.data;
 };
 
+export const bulkUploadFiles = async (formData: FormData, onUploadProgress: (progressEvent: any) => void) => {
+    const response = await api.post('/files/bulk-upload/', formData, {
+        headers: {
+            'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress,
+    });
+    return response;
+};
+
 export const uploadFile = async (file: File, onUploadProgress: (progressEvent: any) => void) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('original_filename', file.name);
-
+    console.log(formData, 'formData')
     const response = await api.post<FileUpload>('/files/upload/', formData, {
         headers: {
             'Content-Type': 'multipart/form-data',
@@ -53,22 +64,7 @@ export const downloadFile = async (fileId: number) => {
     return response.data;
 };
 
-export const createFileShareLink = async (fileId: number, expires_at?: string) => {
-    const response = await api.post<FileShareLink>('/files/share/', {
-        file_upload: fileId,
-        expires_at,
-    });
-    return response.data;
-};
 
-export const getFileShareLinks = async (fileId: number) => {
-    const response = await api.get<FileShareLink[]>(`/files/${fileId}/share-links/`);
-    return response.data;
-};
-
-export const deleteFileShareLink = async (linkId: number) => {
-    await api.delete(`/files/share-links/${linkId}/`);
-};
 
 export const getFileStats = async () => {
     const response = await api.get('/files/stats/');
@@ -80,12 +76,19 @@ export const cleanupOrphanedFiles = async (dryRun = false) => {
     return response.data;
 };
 
-export const cleanupExpiredLinks = async (dryRun = false) => {
-    const response = await api.post('/files/cleanup/expired-links/', { dry_run: dryRun });
-    return response.data;
-};
+
 
 export const cleanupOldLogs = async (days: number, dryRun = false) => {
     const response = await api.post('/files/cleanup/old-logs/', { days, dry_run: dryRun });
+    return response.data;
+};
+
+export const searchFiles = async (params: SearchParams) => {
+    const response = await api.get<PaginatedResponse<FileUpload>>('/files/', {
+        params,
+        paramsSerializer: params => {
+            return qs.stringify(params, { arrayFormat: 'repeat' })
+        }
+    });
     return response.data;
 };

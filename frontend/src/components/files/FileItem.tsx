@@ -1,43 +1,70 @@
-// src/components/files/FileItem.tsx
 import React from 'react';
 import type { FileUpload } from '../../utils/types';
-import { useFileContext } from '../../contexts/FileContext';
 import * as fileService from '../../services/fileService';
+import { FiEye, FiDownload, FiTrash2 } from 'react-icons/fi';
+import { format } from 'date-fns';
 
 interface FileItemProps {
     file: FileUpload;
+    onDelete: (fileId: number) => void;
+    onViewFile: (fileId: number) => void;
 }
 
-const FileItem: React.FC<FileItemProps> = ({ file }) => {
-    const { deleteFile } = useFileContext();
-
-    const handleDownload = async () => {
-        try {
-            const blob = await fileService.downloadFile(file.id);
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = file.original_filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } catch (error) {
-            console.error('Download failed', error);
+const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile }) => {
+    const handleDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (window.confirm(`Are you sure you want to delete ${file.original_filename}?`)) {
+            onDelete(file.id);
         }
     };
 
+    const handleDownload = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        fileService.downloadFile(file.id)
+            .then((blob: Blob) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.original_filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch((error: any) => console.error('Download failed', error));
+    };
+
     return (
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div>
-                <p className="font-semibold">{file.original_filename}</p>
-                <p className="text-sm text-gray-500">{file.file_size} bytes</p>
-            </div>
-            <div>
-                <button onClick={handleDownload} className="text-blue-500 hover:text-blue-700 mr-4">Download</button>
-                <button onClick={() => deleteFile(file.id)} className="text-red-500 hover:text-red-700">Delete</button>
-            </div>
-        </div>
+        <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewFile(file.id)}>
+            <td className="px-6 py-4 whitespace-nowrap">
+                <div className="font-medium text-gray-900">{file.original_filename}</div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                {(file.file_size / 1024).toFixed(2)} KB
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
+                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                    {file.file_type}
+                </span>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                {format(new Date(file.upload_date), 'MMM dd, yyyy')}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
+                <div className="flex items-center justify-end space-x-4">
+                    <button onClick={() => onViewFile(file.id)} className="text-gray-500 hover:text-blue-600">
+                        <FiEye className="w-5 h-5" />
+                    </button>
+                    <button onClick={handleDownload} className="text-gray-500 hover:text-green-600">
+                        <FiDownload className="w-5 h-5" />
+                    </button>
+                    <button onClick={handleDelete} className="text-gray-500 hover:text-red-600">
+                        <FiTrash2 className="w-5 h-5" />
+                    </button>
+                </div>
+            </td>
+        </tr>
     );
 };
 
 export default FileItem;
+
