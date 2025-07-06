@@ -20,7 +20,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search files..."
-                className="border border-gray-300 rounded-l-md p-2 flex-grow bg-gray-950"
+                className="border border-gray-300 rounded-l-md p-2 flex-grow bg-gray-150"
             />
             <button type="submit" className="bg-blue-500 text-white rounded-r-md px-4">
                 Search

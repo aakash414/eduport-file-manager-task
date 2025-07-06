@@ -7,13 +7,11 @@ const Dashboard: React.FC = () => {
     return (
         <FileProvider>
             <div className="p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                    {/* Left Column: File Upload */}
-                    <div className="lg:col-span-1">
+                <div className="grid grid-cols-1 gap-8 items-start">
+                    <div className="">
                         <FileUpload />
                     </div>
-                    {/* Right Column: File List */}
-                    <div className="lg:col-span-2">
+                    <div className="">
                         <FileList />
                     </div>
                 </div>

@@ -1,41 +1,34 @@
-import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import AuthPage from './Pages/auth/AuthPage';
+import { Routes, Route } from 'react-router-dom';
+import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
-import api from './services/api';
+import PublicRoute from './components/PublicRoute';
+import Layout from './components/layout/Layout';
+import NotFound from './pages/NotFound';
+import { ToastProvider } from './context/ToastContext';
 import './App.css';
 
 function App() {
-    useEffect(() => {
-        const getCsrfToken = async () => {
-            try {
-                await api.get('/users/csrf/');
-            } catch (error) {
-                console.error('Failed to fetch CSRF token:', error);
-            }
-        };
-        getCsrfToken();
-    }, []);
-
     return (
-        <div className="App">
-            <header className="App-header">
-                <h1>File Manager</h1>
-            </header>
-            <main>
-                <Routes>
-                    <Route path="/login" element={<AuthPage />} />
-                    <Route path="/register" element={<AuthPage />} />
-                    <Route path="/dashboard" element={
+        <ToastProvider>
+            <Routes>
+                <Route path="/login" element={<PublicRoute><AuthPage /></PublicRoute>} />
+                <Route path="/register" element={<PublicRoute><AuthPage /></PublicRoute>} />
+                <Route
+                    path="/dashboard/*"
+                    element={
                         <ProtectedRoute>
-                            <Dashboard />
+                            <Layout>
+                                <Routes>
+                                    <Route path="/" element={<Dashboard />} />
+                                </Routes>
+                            </Layout>
                         </ProtectedRoute>
-                    } />
-                    <Route path="*" element={<Navigate to="/login" />} />
-                </Routes>
-            </main>
-        </div>
+                    }
+                />
+                <Route path="*" element={<NotFound />} />
+            </Routes>
+        </ToastProvider>
     );
 }
 
