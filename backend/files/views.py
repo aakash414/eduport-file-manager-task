@@ -1,26 +1,27 @@
 # files/views.py
-from rest_framework import generics, status, permissions
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.pagination import CursorPagination
-from django.shortcuts import get_object_or_404
-from django.db.models import Q, Count, Sum, F, Window
-from django.http import HttpResponse, Http404
-from django.utils import timezone
-from django.core.exceptions import PermissionDenied
-from django.db import transaction
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.cache import cache_page
-from django.contrib.auth.models import User
-from datetime import timedelta
+import hashlib
+import json
 import logging
 import os
-from rest_framework.views import APIView
+from datetime import timedelta
+
+from django.contrib.auth.models import User
+from django.core.cache import cache
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction, IntegrityError
+from django.db.models import Q
+from django.http import HttpResponse, Http404
+from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import generics, permissions, status
+from rest_framework.pagination import CursorPagination
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework.views import APIView
+
 from .models import FileUpload
 from .serializers import (
     BulkFileUploadSerializer,
@@ -29,24 +30,19 @@ from .serializers import (
     BulkDeleteSerializer
 )
 
+
 logger = logging.getLogger(__name__)
+
+
+def invalidate_user_file_cache(user):
+    """Invalidates all file-related caches for a given user."""
+    cache.incr(f'user_{user.id}_file_list_version')
+    cache.delete(f'user_{user.id}_file_types')
+    logger.info(f"Invalidated file cache for user {user.id}")
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 class BulkFileUploadView(generics.CreateAPIView):
-    """
-    API endpoint for bulk file uploads.
-
-    This view handles the upload of multiple files in a single request.
-    It ensures that the entire upload process is atomic, meaning that if one
-    file fails to upload, all other uploads in the same batch are rolled back.
-
-    Key Features:
-    - **Transactional Integrity**: Uses `transaction.atomic()` to ensure all-or-nothing uploads.
-    - **Detailed Reporting**: Returns a detailed report of successful and failed uploads.
-    - **Security**: Inherits permission classes to ensure only authenticated users can upload.
-    - **Validation**: Leverages `BulkFileUploadSerializer` for robust validation of each file.
-    """
     serializer_class = BulkFileUploadSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -55,115 +51,107 @@ class BulkFileUploadView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        
         files = serializer.validated_data['files']
+        atomic_mode = request.query_params.get('atomic', 'false').lower() == 'true'
+        
+        if atomic_mode:
+            response = self._atomic_upload(request, files)
+        else:
+            response = self._partial_upload(request, files)
+        
+        if response.status_code in [status.HTTP_201_CREATED, status.HTTP_207_MULTI_STATUS]:
+            invalidate_user_file_cache(request.user)
+            
+        return response
+
+    def _atomic_upload(self, request, files):
         successful_uploads = []
         failed_uploads = []
-
+        
+        for uploaded_file in files:
+            try:
+                file_hash = FileUpload.calculate_file_hash_from_file(uploaded_file)
+                if FileUpload.objects.filter(file_hash=file_hash).exists():
+                    failed_uploads.append({'filename': uploaded_file.name, 'error': f"Duplicate file detected: {uploaded_file.name}"})
+                uploaded_file.seek(0)
+            except Exception as e:
+                failed_uploads.append({'filename': uploaded_file.name, 'error': str(e)})
+        
+        if failed_uploads:
+            return Response({'error': 'Atomic bulk upload failed validation.', 'failed_uploads': failed_uploads}, status=status.HTTP_400_BAD_REQUEST)
+        
         try:
             with transaction.atomic():
                 for uploaded_file in files:
-                    try:
-                        # Create a FileUpload instance for each file.
-                        file_upload = FileUpload.objects.create(
-                            uploaded_by=request.user,
-                            file=uploaded_file,
-                            original_filename=uploaded_file.name,
-                            file_size=uploaded_file.size,
-                            file_type=uploaded_file.content_type,
-                        )
-                        successful_uploads.append({
-                            'filename': uploaded_file.name,
-                            'file_id': file_upload.id,
-                            'message': 'Upload successful.'
-                        })
-                    except Exception as e:
-                        # If a single file fails, record the error and re-raise to trigger a rollback.
-                        failed_uploads.append({
-                            'filename': uploaded_file.name,
-                            'error': str(e)
-                        })
-                        # This exception will cause the transaction to be rolled back.
-                        raise
-
+                    file_hash = FileUpload.calculate_file_hash_from_file(uploaded_file)
+                    uploaded_file.seek(0)
+                    file_upload = FileUpload.objects.create(uploaded_by=request.user, file=uploaded_file, original_filename=uploaded_file.name, file_size=uploaded_file.size, file_type=uploaded_file.content_type, file_hash=file_hash)
+                    successful_uploads.append({'filename': uploaded_file.name, 'file_id': file_upload.id, 'message': 'Upload successful.'})
+            return Response({'message': 'Atomic bulk upload completed successfully.', 'successful_uploads': successful_uploads}, status=status.HTTP_201_CREATED)
         except Exception as e:
-            # This block catches the exception from the transaction, logs it, and returns a failure response.
-            logger.error(f"Bulk upload failed and was rolled back: {str(e)}")
-            return Response({
-                'error': 'Bulk upload failed. The entire transaction has been rolled back.',
-                'details': str(e),
-                'failed_files': failed_uploads
-            }, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Atomic bulk upload failed during save: {str(e)}")
+            return Response({'error': 'A critical error occurred during the save process.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # If the transaction completes successfully, return a success response.
-        return Response({
-            'message': 'Bulk upload completed.',
-            'successful_uploads': successful_uploads,
-            'failed_uploads': failed_uploads  # This will be empty if all files succeeded.
-        }, status=status.HTTP_201_CREATED)
-
-
-
+    def _partial_upload(self, request, files):
+        successful_uploads = []
+        failed_uploads = []
+        
+        for uploaded_file in files:
+            try:
+                file_hash = FileUpload.calculate_file_hash_from_file(uploaded_file)
+                uploaded_file.seek(0)
+                if FileUpload.objects.filter(file_hash=file_hash).exists():
+                    failed_uploads.append({'filename': uploaded_file.name, 'error': f"Duplicate file detected: {uploaded_file.name}"})
+                    continue
+                file_upload = FileUpload.objects.create(uploaded_by=request.user, file=uploaded_file, original_filename=uploaded_file.name, file_size=uploaded_file.size, file_type=uploaded_file.content_type, file_hash=file_hash)
+                successful_uploads.append({'filename': uploaded_file.name, 'file_id': file_upload.id, 'message': 'Upload successful.'})
+            except (IntegrityError, ValidationError) as e:
+                failed_uploads.append({'filename': uploaded_file.name, 'error': str(e)})
+            except Exception as e:
+                logger.error(f"Unexpected error uploading {uploaded_file.name}: {str(e)}")
+                failed_uploads.append({'filename': uploaded_file.name, 'error': f"Unexpected error: {str(e)}"})
+        
+        if successful_uploads and not failed_uploads:
+            status_code = status.HTTP_201_CREATED
+            message = 'Bulk upload completed successfully.'
+        elif successful_uploads and failed_uploads:
+            status_code = status.HTTP_207_MULTI_STATUS
+            message = 'Bulk upload completed with some failures.'
+        else:
+            status_code = status.HTTP_400_BAD_REQUEST
+            message = 'Bulk upload failed. No files were uploaded.'
+        
+        return Response({'message': message, 'successful_uploads': successful_uploads, 'failed_uploads': failed_uploads}, status=status_code)
 
 
 class FileUploadView(generics.CreateAPIView):
-    """
-    API endpoint for file uploads.
-    
-    Interview Talking Points:
-    - Multipart file handling
-    - Security validations
-    - Duplicate detection
-    - Error handling for edge cases
-    """
     serializer_class = FileUploadSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
-    
-    def perform_create(self, serializer):
-        """
-        Custom create logic with logging and analytics.
-        """
-        try:
-            # Save the file with current user
-            file_upload = serializer.save(uploaded_by=self.request.user)
-            
-            # Log successful upload
-            logger.info(
-                f"File uploaded successfully: {file_upload.original_filename} "
-                f"by user {self.request.user.username}"
-            )
-            
-            # Check for duplicates and log if found
-            if FileUpload.objects.filter(file_hash=file_upload.file_hash).count() > 1:
-                logger.warning(
-                    f"Duplicate file uploaded: {file_upload.file_hash} "
-                    f"by user {self.request.user.username}"
-                )
-            
-        except Exception as e:
-            logger.error(f"File upload failed: {str(e)}")
-            raise
-    
-    def create(self, request, *args, **kwargs):
-        """
-        Enhanced create with better error handling.
-        """
-        try:
-            response = super().create(request, *args, **kwargs)
-            
-            # Add success message
-            response.data['message'] = 'File uploaded successfully'
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"File upload error: {str(e)}")
-            return Response(
-                {'error': 'File upload failed. Please try again.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except IntegrityError:
+            uploaded_file = request.data.get('file')
+            if not uploaded_file:
+                return Response({"error": "File data not provided."}, status=status.HTTP_400_BAD_REQUEST)
+            file_hash = FileUpload.calculate_file_hash_from_file(uploaded_file)
+            existing_file = FileUpload.objects.filter(file_hash=file_hash).first()
+            if existing_file:
+                message = "You have already uploaded this exact file." if existing_file.uploaded_by == request.user else "A file with the same content already exists."
+                return Response({"error": "Duplicate file detected.", "detail": message, "existing_file_id": existing_file.id}, status=status.HTTP_409_CONFLICT)
+            logger.error("An unexpected IntegrityError occurred during file upload.", exc_info=True)
+            return Response({"error": "A database conflict occurred."}, status=status.HTTP_409_CONFLICT)
+
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)
+        invalidate_user_file_cache(self.request.user)
 
 
 class FileCursorPagination(CursorPagination):
@@ -171,47 +159,57 @@ class FileCursorPagination(CursorPagination):
     page_size = 10
 
 
+class FileTypesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        cache_key = f'user_{request.user.id}_file_types'
+        cached_types = cache.get(cache_key)
+        if cached_types is not None:
+            return Response(cached_types)
+
+        file_types = FileUpload.objects.filter(uploaded_by=request.user).values_list('file_type', flat=True).distinct().order_by('file_type')
+        unique_types = sorted([ft for ft in file_types if ft])
+        
+        cache.set(cache_key, unique_types, 60 * 60) # Cache for 1 hour
+        return Response(unique_types)
+
+
 class FileListView(generics.ListAPIView):
-    """
-    API endpoint for listing user's files with search and filtering.
-    
-    This view is optimized for performance with:
-    - **Cursor Pagination**: For efficient navigation of large datasets.
-    - **Caching**: Caches responses to reduce database load.
-    - **Optimized Queries**: Uses `select_related` to prevent N+1 problems.
-    - **Advanced Filtering**: Supports filtering by name, type, date, and size.
-    """
     serializer_class = FileListSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = FileCursorPagination
-    
-    @method_decorator(cache_page(60 * 5)) # Cache results for 5 minutes
-    def get(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
+
+    def list(self, request, *args, **kwargs):
+        version = cache.get(f'user_{request.user.id}_file_list_version', 1)
+        query_params = request.query_params.dict()
+        sorted_params = json.dumps(sorted(query_params.items()))
+        params_hash = hashlib.md5(sorted_params.encode('utf-8')).hexdigest()
+        cache_key = f'user_{request.user.id}_file_list_v{version}_{params_hash}'
+
+        cached_response = cache.get(cache_key)
+        if cached_response:
+            logger.info(f"Serving file list from cache for user {request.user.id}")
+            return Response(cached_response)
+
+        logger.info(f"Generating new file list for user {request.user.id}")
+        response = super().list(request, *args, **kwargs)
+        
+        if response.status_code == 200:
+            cache.set(cache_key, response.data, 60 * 15) # Cache for 15 minutes
+        
+        return response
 
     def get_queryset(self):
-        """
-        Builds a filtered and optimized queryset based on query parameters.
-        """
-        queryset = FileUpload.objects.filter(
-            uploaded_by=self.request.user
-        ).select_related('uploaded_by')
-
-        # Search functionality (case-insensitive)
+        queryset = FileUpload.objects.filter(uploaded_by=self.request.user).select_related('uploaded_by')
         search_query = self.request.query_params.get('search', None)
         if search_query:
-            queryset = queryset.filter(
-                Q(original_filename__icontains=search_query) |
-                Q(description__icontains=search_query)
-            )
+            queryset = queryset.filter(Q(original_filename__icontains=search_query) | Q(description__icontains=search_query))
         
-        # File type filtering for multiple values
         file_types = self.request.query_params.getlist('file_type') or self.request.query_params.getlist('file_type[]')
         if file_types:
-            # file_type in the DB is now standardized to a lowercase extension.
             queryset = queryset.filter(file_type__in=[ft.lower() for ft in file_types])
         
-        # Date range filtering
         uploaded_after = self.request.query_params.get('uploaded_after', None)
         if uploaded_after:
             queryset = queryset.filter(upload_date__gte=uploaded_after)
@@ -220,110 +218,38 @@ class FileListView(generics.ListAPIView):
         if uploaded_before:
             queryset = queryset.filter(upload_date__lte=uploaded_before)
         
-        # Size filtering (in bytes)
-        min_size = self.request.query_params.get('min_size', None)
-        if min_size:
-            queryset = queryset.filter(file_size__gte=int(min_size))
-        
-        max_size = self.request.query_params.get('max_size', None)
-        if max_size:
-            queryset = queryset.filter(file_size__lte=int(max_size))
-        
-        # Ordering - cursor pagination requires a consistent ordering
         ordering = self.request.query_params.get('ordering', '-upload_date')
-        valid_ordering_fields = [
-            'upload_date', '-upload_date', 
-            'original_filename', '-original_filename', 
-            'file_size', '-file_size'
-        ]
+        valid_ordering_fields = ['upload_date', '-upload_date', 'original_filename', '-original_filename', 'file_size', '-file_size']
         if ordering in valid_ordering_fields:
             queryset = queryset.order_by(ordering)
         else:
-            # Default ordering for cursor pagination
             queryset = queryset.order_by('-upload_date')
         
         return queryset
 
 
 class FileDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    API endpoint for file detail operations.
-    
-    Interview Talking Points:
-    - Permission-based access control
-    - Atomic updates
-    - Soft deletion considerations
-    - Access logging
-    """
     serializer_class = FileDetailSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Ensure users can only access their own files."""
         return FileUpload.objects.filter(uploaded_by=self.request.user)
-    
+
     def retrieve(self, request, *args, **kwargs):
-        """
-        Retrieve file with access logging.
-        """
         instance = self.get_object()
-        
-        # Update last accessed timestamp
         instance.mark_accessed()
-        
-        # Log file access
-        logger.info(
-            f"File accessed: {instance.original_filename} "
-            f"by user {request.user.username}"
-        )
-        
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
-    
-    def update(self, request, *args, **kwargs):
-        """
-        Update file with validation.
-        """
-        try:
-            response = super().update(request, *args, **kwargs)
-            logger.info(
-                f"File updated: {self.get_object().original_filename} "
-                f"by user {request.user.username}"
-            )
-            return response
-        except Exception as e:
-            logger.error(f"File update failed: {str(e)}")
-            return Response(
-                {'error': 'File update failed.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    def destroy(self, request, *args, **kwargs):
-        """
-        Delete file with logging.
-        """
-        instance = self.get_object()
-        filename = instance.original_filename
-        
-        try:
-            # Delete the file
-            response = super().destroy(request, *args, **kwargs)
-            
-            logger.info(
-                f"File deleted: {filename} by user {request.user.username}"
-            )
-            
-            return Response(
-                {'message': f'File "{filename}" deleted successfully.'},
-                status=status.HTTP_204_NO_CONTENT
-            )
-            
-        except Exception as e:
-            logger.error(f"File deletion failed: {str(e)}")
-            return Response(
-                {'error': 'File deletion failed.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        logger.info(f"File {instance.id} accessed by user {request.user.id}")
+        return super().retrieve(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        serializer.save()
+        invalidate_user_file_cache(self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.file and os.path.isfile(instance.file.path):
+            os.remove(instance.file.path)
+        instance.delete()
+        invalidate_user_file_cache(self.request.user)
 
 
 class FileDownloadView(generics.RetrieveAPIView):
@@ -371,6 +297,7 @@ class FileDownloadView(generics.RetrieveAPIView):
         except Exception as e:
             logger.error(f"File download failed: {str(e)}")
             raise Http404("File not found or access denied.")
+
 
 class FileDetailedInfoView(APIView):
     """

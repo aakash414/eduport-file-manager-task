@@ -9,3 +9,5 @@ psycopg[binary]
 # Environment
 python-dotenv==1.0.1
 gunicorn==22.0.0
+drf-spectacular
+django-redis==5.4.0

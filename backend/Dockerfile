@@ -11,6 +11,10 @@ RUN useradd -m -d /home/appuser -s /bin/bash appuser
 # Set the working directory in the container
 WORKDIR /home/appuser/app
 
+# Create media and static directories and set ownership
+RUN mkdir -p media static
+RUN chown -R appuser:appuser /home/appuser/app
+
 # Install dependencies
 COPY --chown=appuser:appuser requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

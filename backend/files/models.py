@@ -1,5 +1,4 @@
 # models.py
-import os
 import hashlib
 from django.db import models
 from django.contrib.auth.models import User
@@ -181,21 +180,19 @@ class FileUpload(models.Model):
 
         super().save(*args, **kwargs)
     
+    @staticmethod
+    def calculate_file_hash_from_file(file_obj):
+        if not file_obj:
+            return None
+        hasher = hashlib.sha256()
+        file_obj.seek(0)
+        for chunk in file_obj.chunks():
+            hasher.update(chunk)
+        file_obj.seek(0)
+        return hasher.hexdigest()
+
     def calculate_file_hash(self):
-        """
-        Calculate SHA256 hash of file content.
-        This is used for duplicate detection across the entire system.
-        """
-        hash_sha256 = hashlib.sha256()
-        
-        # Read file in chunks to handle large files efficiently
-        for chunk in self.file.chunks():
-            hash_sha256.update(chunk)
-        
-        # Reset file pointer to beginning
-        self.file.seek(0)
-        
-        return hash_sha256.hexdigest()
+        return self.calculate_file_hash_from_file(self.file)
     
     def get_file_type(self):
         """
