@@ -5,15 +5,21 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
+# Create a non-root user
+RUN useradd -m -d /home/appuser -s /bin/bash appuser
+
 # Set the working directory in the container
-WORKDIR /app
+WORKDIR /home/appuser/app
 
 # Install dependencies
-COPY requirements.txt /app/
+COPY --chown=appuser:appuser requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application's code
-COPY . /app/
+COPY --chown=appuser:appuser . .
+
+# Switch to the non-root user
+USER appuser
 
 # Expose the port the app runs on
 EXPOSE 8000

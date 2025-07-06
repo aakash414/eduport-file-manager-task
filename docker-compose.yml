@@ -2,20 +2,31 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./backend:/home/appuser/app
+      - static_volume:/home/appuser/app/static
+      - media_volume:/home/appuser/app/media
     env_file:
       - .env
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
+    entrypoint: >
+      sh -c "python manage.py migrate &&
+             gunicorn file_manager.wsgi:application --bind 0.0.0.0:8000"
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:80"
     volumes:
@@ -41,5 +52,16 @@ services:
       timeout: 10s
       retries: 3
 
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
   postgres_data:
+  static_volume:
+  media_volume:
+  redis_data:
