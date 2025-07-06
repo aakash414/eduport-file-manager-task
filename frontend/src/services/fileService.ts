@@ -83,6 +83,11 @@ export const cleanupOldLogs = async (days: number, dryRun = false) => {
     return response.data;
 };
 
+export const getFileTypes = async (): Promise<string[]> => {
+    const response = await api.get<string[]>('/files/types/');
+    return response.data;
+};
+
 export const searchFiles = async (params: SearchParams) => {
     const response = await api.get<PaginatedResponse<FileUpload>>('/files/', {
         params,

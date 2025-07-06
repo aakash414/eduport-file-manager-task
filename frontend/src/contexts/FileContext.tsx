@@ -6,9 +6,7 @@ import type { SearchParams } from '../utils/types';
 interface FileContextType {
     fileData: ReturnType<typeof useFiles>['fileData'];
     loading: boolean;
-    error: string | null;
     progress: number;
-    successMessage: string | null;
     uploadReport: { successful: any[]; failed: any[] } | null;
     fetchPage: (url: string | null) => void;
     uploadFile: (file: File) => void;
@@ -20,10 +18,30 @@ interface FileContextType {
 const FileContext = createContext<FileContextType | undefined>(undefined);
 
 export const FileProvider = ({ children }: { children: ReactNode }) => {
-            const { fileData, loading, error, progress, successMessage, uploadReport, fetchPage, uploadFile, bulkUploadFiles, deleteFile, searchFiles } = useFiles();
+    const {
+        fileData,
+        loading,
+        progress,
+        uploadReport,
+        fetchPage,
+        uploadFile,
+        bulkUploadFiles,
+        deleteFile,
+        searchFiles
+    } = useFiles();
 
     return (
-                        <FileContext.Provider value={{ fileData, loading, error, progress, successMessage, uploadReport, fetchPage, uploadFile, bulkUploadFiles, deleteFile, searchFiles }}>
+        <FileContext.Provider value={{
+            fileData,
+            loading,
+            progress,
+            uploadReport,
+            fetchPage,
+            uploadFile,
+            bulkUploadFiles,
+            deleteFile,
+            searchFiles
+        }}>
             {children}
         </FileContext.Provider>
     );

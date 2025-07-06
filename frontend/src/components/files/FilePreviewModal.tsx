@@ -96,7 +96,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ fileId, onClose, on
 
             try {
                 // Fetch file details first
-                const detailsResponse = await apiClient.get(`/api/files/${fileId}/`, {
+                const detailsResponse = await apiClient.get(`/files/${fileId}/`, {
                     signal: abortController.signal,
                 });
                 const fileDetails: FileUpload = detailsResponse.data;
@@ -117,13 +117,13 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ fileId, onClose, on
                     try {
                         if (mimeType.startsWith('text/')) {
                             setIsText(true);
-                            const previewResponse = await apiClient.get(`/api/files/${fileId}/content-preview/`, {
+                            const previewResponse = await apiClient.get(`/files/${fileId}/content-preview/`, {
                                 responseType: 'text',
                                 signal: abortController.signal,
                             });
                             setFileContent(previewResponse.data);
                         } else {
-                            const previewResponse = await apiClient.get(`/api/files/${fileId}/content-preview/`, {
+                            const previewResponse = await apiClient.get(`/files/${fileId}/content-preview/`, {
                                 responseType: 'blob',
                                 signal: abortController.signal,
                             });
@@ -163,7 +163,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ fileId, onClose, on
     const handleDownload = async () => {
         if (!file) return;
         try {
-            const response = await apiClient.get(`/api/files/${file.id}/download/`, {
+            const response = await apiClient.get(`/files/${file.id}/download/`, {
                 responseType: 'blob',
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
