@@ -21,6 +21,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
 
 from .models import FileUpload
 from .serializers import (
@@ -35,8 +36,20 @@ logger = logging.getLogger(__name__)
 
 
 def invalidate_user_file_cache(user):
-    """Invalidates all file-related caches for a given user."""
-    cache.incr(f'user_{user.id}_file_list_version')
+    """
+    Invalidates all file-related caches for a given user by bumping a version number.
+    This is an atomic and efficient way to invalidate caches.
+    """
+    version_key = f'user_{user.id}_file_list_version'
+    try:
+        # Atomically increment the version number.
+        cache.incr(version_key)
+    except ValueError:
+        # If the key doesn't exist, `incr` fails. We initialize it.
+        # The default version in FileListView is 1, so we start invalidation at 2.
+        cache.set(version_key, 2, timeout=None)  # No timeout, should persist
+
+    # Also clear the separate file types cache.
     cache.delete(f'user_{user.id}_file_types')
     logger.info(f"Invalidated file cache for user {user.id}")
 
@@ -385,6 +398,13 @@ class FileContentPreviewView(APIView):
     PREVIEWABLE_AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg']
     PREVIEWABLE_PDF_EXTENSIONS = ['pdf']
     PREVIEWABLE_TEXT_EXTENSIONS = ['txt', 'md', 'csv', 'log', 'json', 'xml', 'html', 'css', 'js', 'py', 'java', 'cpp', 'c', 'h']
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny]) # Should be accessible without auth
+def health_check(request):
+    """Simple health check endpoint to confirm the service is up."""
+    return Response({'status': 'ok', 'message': 'Service is healthy.'}, status=status.HTTP_200_OK)
     
     # Also define by MIME type for when it's available
     PREVIEWABLE_MIME_PREFIXES = ['image/', 'video/', 'audio/']
