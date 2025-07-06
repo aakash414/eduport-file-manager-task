@@ -50,7 +50,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile }) => {
                 {format(new Date(file.upload_date), 'MMM dd, yyyy')}
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
-                <div className="flex items-center space-around space-x-4">
+                <div className="flex items-center justify-around space-x-4">
                     <button onClick={() => onViewFile(file.id)} className="text-gray-500 hover:text-blue-600">
                         <FiEye className="w-5 h-5" />
                     </button>

@@ -7,11 +7,6 @@ from .models import FileUpload, FileAccessLog
 
 @admin.register(FileUpload)
 class FileUploadAdmin(admin.ModelAdmin):
-    """
-    Admin interface for FileUpload model.
-    Provides comprehensive file management capabilities.
-    """
-    
     # List view configuration
     list_display = [
         'original_filename',
