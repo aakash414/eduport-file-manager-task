@@ -1,5 +1,10 @@
 // src/utils/types.ts
 
+export interface ProgressEvent {
+  loaded: number;
+  total: number;
+}
+
 export interface User {
     id: number;
     username: string;
@@ -8,43 +13,40 @@ export interface User {
 
 export interface FileUpload {
     id: number;
+    file: string;
     original_filename: string;
-    file_size: number;
+    description: string;
     file_type: string;
+    file_size: number;
     upload_date: string;
-    description?: string;
-    last_accessed?: string;
+    last_accessed: string;
+    view_count: number;
+    is_duplicate: boolean;
+    permissions?: {
+        can_download: boolean;
+
+        can_delete: boolean;
+    };
     uploaded_by: User;
 }
 
-export interface FileShareLink {
-    id: number;
-    file_upload: number;
-    token: string;
-    expires_at?: string;
-    created_at: string;
-    access_count: number;
-}
 
-export interface FileAccessLog {
-    id: number;
-    file_upload: number;
-    user?: User;
-    share_link?: number;
-    timestamp: string;
-    access_type: string;
-    ip_address?: string;
-    user_agent?: string;
+
+export interface SearchParams {
+    [key: string]: any;
+    query?: string;
+    file_type?: string[];
+    start_date?: string;
+    end_date?: string;
+    size_min?: number;
+    size_max?: number;
+    page?: number;
+    page_size?: number;
 }
 
 export interface PaginatedResponse<T> {
-    pagination: {
-        count: number;
-        current_page: number;
-        total_pages: number;
-        page_size: number;
-        has_next: boolean;
-        has_previous: boolean;
-    };
+    count: number;
+    next: string | null;
+    previous: string | null;
     results: T[];
 }

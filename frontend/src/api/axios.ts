@@ -1,13 +1,4 @@
-// src/services/api.ts
 import axios from 'axios';
-
-const api = axios.create({
-    baseURL: '/api',
-    withCredentials: true,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
 
 // Function to get CSRF token from cookies
 function getCookie(name: string): string | null {
@@ -16,6 +7,7 @@ function getCookie(name: string): string | null {
         const cookies = document.cookie.split(';');
         for (let i = 0; i < cookies.length; i++) {
             const cookie = cookies[i].trim();
+            // Does this cookie string begin with the name we want?
             if (cookie.substring(0, name.length + 1) === (name + '=')) {
                 cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                 break;
@@ -25,15 +17,20 @@ function getCookie(name: string): string | null {
     return cookieValue;
 }
 
-// Use a request interceptor to attach the CSRF token to every request.
-api.interceptors.request.use(config => {
-    const csrfToken = getCookie('csrftoken');
-    if (csrfToken) {
-        config.headers['X-CSRFToken'] = csrfToken;
-    }
-    return config;
-}, error => {
-    return Promise.reject(error);
+const apiClient = axios.create({
+    baseURL: 'http://localhost:8000/api',
+    withCredentials: true, // Important for sending cookies
 });
 
-export default api;
+// Add a request interceptor to include the CSRF token
+apiClient.interceptors.request.use((config) => {
+    if (config.method && ['post', 'put', 'patch', 'delete'].includes(config.method)) {
+        const csrfToken = getCookie('csrftoken');
+        if (csrfToken) {
+            config.headers['X-CSRFToken'] = csrfToken;
+        }
+    }
+    return config;
+});
+
+export default apiClient;
