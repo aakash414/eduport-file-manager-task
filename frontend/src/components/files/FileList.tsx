@@ -8,7 +8,7 @@ import { getFileTypes } from '../../services/fileService';
 import type { SearchParams } from '../../utils/types';
 
 export const FileList: React.FC = () => {
-    const { fileData, loading, fetchPage, deleteFile, searchFiles } = useFileContext();
+    const { fileData, loading, fetchPage, deleteFile, searchFiles, bulkDeleteFiles } = useFileContext();
     const [previewingFileIndex, setPreviewingFileIndex] = useState<number | null>(null);
     const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
 
@@ -63,6 +63,12 @@ export const FileList: React.FC = () => {
 
     const handleDeleteFile = async (fileId: number) => {
         await deleteFile(fileId);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedFiles.length === 0) return;
+        await bulkDeleteFiles(selectedFiles);
+        setSelectedFiles([]);
     };
 
     const handleNextPage = () => {
@@ -175,12 +181,12 @@ export const FileList: React.FC = () => {
                 <div className="flex justify-between items-center mb-4">
                     <div className="flex items-center space-x-4">
                         <button
-                            onClick={() => handleDeleteFile(selectedFiles[0])}
-                            disabled={!selectedFiles.length}
-                            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            onClick={handleBulkDelete}
+                            disabled={selectedFiles.length === 0}
+                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                         >
-                            <FiTrash2 className="w-5 h-5" />
-                            <span>Delete Selected ({selectedFiles.length})</span>
+                            <FiTrash2 className="mr-2" />
+                            Delete Selected ({selectedFiles.length})
                         </button>
                     </div>
                 </div>
