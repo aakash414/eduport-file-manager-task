@@ -83,31 +83,15 @@ class FileUploadSerializer(serializers.ModelSerializer):
         ]
     
     def get_file_url(self, obj):
-        """
-        Get the file URL for download.
-        Security: Only returns URL if user has access to the file.
-        """
         request = self.context.get('request')
         if request and obj.file:
             return request.build_absolute_uri(obj.file.url)
         return None
     
     def get_is_duplicate(self, obj):
-        """
-        Check if file is a duplicate.
-        Performance: This is efficient due to unique index on file_hash.
-        """
         return FileUpload.objects.filter(file_hash=obj.file_hash).count() > 1
     
     def validate_file(self, value):
-        """
-        Comprehensive file validation.
-        
-        Security Considerations:
-        - File size limits
-        - File type restrictions
-        - Malicious file detection
-        """
         if not value:
             raise serializers.ValidationError("No file provided.")
         
@@ -121,8 +105,9 @@ class FileUploadSerializer(serializers.ModelSerializer):
         # File type validation
         allowed_extensions = [
             'pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'gif',
-            'mp4', 'avi', 'mov', 'zip', 'rar', 'csv', 'xlsx', 'xls'
+            'mp4', 'avi', 'mov', 'zip', 'rar', 'csv', 'xlsx', 'xls', 'mp3'
         ]
+        print(f"DEBUG: Allowed extensions at runtime: {allowed_extensions}")
         
         file_extension = value.name.split('.')[-1].lower() if '.' in value.name else ''
         if file_extension not in allowed_extensions:
@@ -192,89 +177,122 @@ class FileUploadSerializer(serializers.ModelSerializer):
 
 
 class FileListSerializer(serializers.ModelSerializer):
-    """
-    Lightweight serializer for file listing.
-    
-    Performance: Minimal fields for efficient pagination.
-    """
     file_size_display = serializers.CharField(source='get_file_size_display', read_only=True)
     uploaded_by = serializers.StringRelatedField(read_only=True)
+
+    file_url = serializers.SerializerMethodField()
+    file_hash = serializers.CharField(read_only=True)
+    duplicate_info = serializers.SerializerMethodField()
+    content_preview_url = serializers.SerializerMethodField()
 
     class Meta:
         model = FileUpload
         fields = [
             'id', 'original_filename', 'file_size', 'file_size_display',
-            'file_type', 'upload_date', 'uploaded_by', 'last_accessed'
+            'file_type', 'upload_date', 'uploaded_by', 'last_accessed',
+            'file_url', 'file_hash', 'duplicate_info', 'content_preview_url'
         ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        fields_to_keep = {
+            'id', 'original_filename', 'file_size', 'file_size_display',
+            'file_type', 'upload_date', 'uploaded_by', 'last_accessed',
+            'file_url'
+        }
+        
+        request = self.context.get('request')
+        if request:
+            if request.query_params.get('preview', 'false').lower() == 'true':
+                fields_to_keep.add('content_preview_url')
+        
+        # Remove any fields not in our final set.
+        existing = set(self.fields.keys())
+        for field_name in existing - fields_to_keep:
+            self.fields.pop(field_name)
+
+    def get_file_url(self, obj):
+        if obj.file:
+            return obj.file.url
+        return None
+
+    def get_duplicate_info(self, obj):
+        return obj.get_duplicate_info()
+
+    def get_content_preview_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            from django.urls import reverse
+            return request.build_absolute_uri(reverse('files:file-content-preview', kwargs={'pk': obj.id}))
+        return None
 
 
 class FileDetailSerializer(serializers.ModelSerializer):
-    """
-    Detailed serializer for single file view.
-    
-    Includes all metadata and related information.
-    """
+
     file_size_display = serializers.CharField(source='get_file_size_display', read_only=True)
     uploaded_by = serializers.StringRelatedField(read_only=True)
     file_url = serializers.SerializerMethodField()
     duplicate_info = serializers.SerializerMethodField()
-    
+    max_size = serializers.IntegerField(read_only=True)
+    content_preview_url = serializers.SerializerMethodField()
+
     class Meta:
         model = FileUpload
         fields = [
             'id', 'file', 'original_filename', 'description',
             'file_hash', 'file_size', 'file_size_display', 'file_type',
             'upload_date', 'uploaded_by', 'file_url', 'last_accessed',
-            'duplicate_info'
+            'duplicate_info',
+            'max_size',
+            'content_preview_url'
         ]
-    
+
     def get_file_url(self, obj):
-        """Get file URL for download."""
         request = self.context.get('request')
         if request and obj.file:
             return request.build_absolute_uri(obj.file.url)
         return None
-    
+
     def get_duplicate_info(self, obj):
-        """Get duplicate file information."""
         return obj.get_duplicate_info()
+
+    def get_content_preview_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            from django.urls import reverse
+            return request.build_absolute_uri(reverse('files:file-content-preview', kwargs={'pk': obj.id}))
+        return None
 
 
         
         return super().create(validated_data)
 
 
+
 class FileSearchSerializer(serializers.Serializer):
-    """
-    Serializer for file search parameters.
-    
-    Interview Talking Points:
-    - Search optimization strategies
-    - Query parameter validation
-    - Performance considerations for large datasets
-    """
-    
     search = serializers.CharField(
         required=False,
         max_length=255,
-        help_text="Search in filename"
+        allow_blank=True,
+        help_text="Search in filename and description"
     )
     
     file_type = serializers.CharField(
         required=False,
         max_length=10,
-        help_text="Filter by file type"
+        help_text="Filter by single file type"
     )
     
-    uploaded_after = serializers.DateTimeField(
+    file_types = serializers.ListField(
+        child=serializers.CharField(max_length=10),
         required=False,
-        help_text="Filter files uploaded after this date"
+        allow_empty=True,
+        help_text="Filter by multiple file types"
     )
     
-    uploaded_before = serializers.DateTimeField(
-        required=False,
-        help_text="Filter files uploaded before this date"
-    )
+    start_date = serializers.DateField(required=False, help_text="Filter for files uploaded on or after this date.")
+    end_date = serializers.DateField(required=False, help_text="Filter for files uploaded on or before this date.")
     
     min_size = serializers.IntegerField(
         required=False,
@@ -290,64 +308,57 @@ class FileSearchSerializer(serializers.Serializer):
     
     ordering = serializers.ChoiceField(
         choices=[
-            'upload_date', '-upload_date',
-            'original_filename', '-original_filename',
-            'file_size', '-file_size'
+            ('upload_date', 'Upload Date (Ascending)'),
+            ('-upload_date', 'Upload Date (Descending)'),
+            ('original_filename', 'Filename (A-Z)'),
+            ('-original_filename', 'Filename (Z-A)'),
+            ('file_size', 'File Size (Smallest First)'),
+            ('-file_size', 'File Size (Largest First)'),
         ],
         default='-upload_date',
         help_text="Ordering field"
     )
     
     def validate(self, data):
-        """Cross-field validation."""
-        # Validate date range
-        if 'uploaded_after' in data and 'uploaded_before' in data:
-            if data['uploaded_after'] >= data['uploaded_before']:
-                raise serializers.ValidationError(
-                    "uploaded_after must be before uploaded_before"
-                )
+        """
+        Custom validation to ensure logical consistency of filter parameters.
+        """
+        # Validate file size range
+        min_size = data.get('min_size')
+        max_size = data.get('max_size')
         
-        # Validate size range
-        if 'min_size' in data and 'max_size' in data:
-            if data['min_size'] > data['max_size']:
-                raise serializers.ValidationError(
-                    "min_size must be less than or equal to max_size"
-                )
+        if min_size is not None and max_size is not None:
+            if min_size > max_size:
+                raise serializers.ValidationError({
+                    'min_size': 'Minimum size cannot be greater than maximum size.'
+                })
+        
+        file_type = data.get('file_type')
+        file_types = data.get('file_types', [])
+        
+        if file_type and file_types:
+            raise serializers.ValidationError({
+                'file_type': 'Cannot specify both file_type and file_types'
+            })
+        
+        if file_type and not file_types:
+            data['file_types'] = [file_type]
         
         return data
-
-
-class FileStatsSerializer(serializers.Serializer):
-    """
-    Serializer for file statistics.
     
-    Used for dashboard analytics and reporting.
-    """
+    def validate_file_type(self, value):
+        """Validate single file type."""
+        if value:
+            return value.lower()
+        return value
     
-    total_files = serializers.IntegerField()
-    total_size = serializers.IntegerField()
-    total_size_display = serializers.CharField()
-    file_types = serializers.ListField(
-        child=serializers.DictField()
-    )
-    recent_uploads = serializers.IntegerField()
-    
-    class Meta:
-        fields = [
-            'total_files', 'total_size', 'total_size_display',
-            'file_types', 'recent_uploads'
-        ]
-
+    def validate_file_types(self, value):
+        """Validate multiple file types."""
+        if value:
+            return [ft.lower() for ft in value]
+        return value
 
 class BulkDeleteSerializer(serializers.Serializer):
-    """
-    Serializer for bulk file deletion.
-    
-    Interview Talking Points:
-    - Bulk operations for better UX
-    - Validation for destructive operations
-    - Error handling for partial failures
-    """
     
     file_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -362,7 +373,6 @@ class BulkDeleteSerializer(serializers.Serializer):
     )
     
     def validate_confirm(self, value):
-        """Require explicit confirmation for bulk deletion."""
         if not value:
             raise serializers.ValidationError(
                 "Bulk deletion requires explicit confirmation."
@@ -370,7 +380,6 @@ class BulkDeleteSerializer(serializers.Serializer):
         return value
     
     def validate_file_ids(self, value):
-        """Validate file IDs exist and belong to user."""
         request = self.context.get('request')
         if not request or not request.user:
             raise serializers.ValidationError("Authentication required.")

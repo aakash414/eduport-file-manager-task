@@ -18,13 +18,9 @@ urlpatterns = [
     # Bulk operations
     path('bulk-upload/', views.BulkFileUploadView.as_view(), name='bulk_file_upload'),
     path('bulk-delete/', views.bulk_delete_files, name='bulk-delete'),
-    path('duplicates/', views.duplicate_files_cleanup, name='duplicate-cleanup'),
     
     # Statistics and analytics
-    path('stats/', views.file_stats, name='file-stats'),
     
-    # Advanced search
-    path('advanced-search/', views.advanced_search, name='advanced_search'),
     
 
 ]

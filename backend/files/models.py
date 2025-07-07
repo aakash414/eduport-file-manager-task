@@ -10,32 +10,20 @@ from .utils import user_directory_path, validate_file_size, validate_file_type
 
 
 class FileUpload(models.Model):
-    """
-    Model for storing uploaded files with duplicate detection.
     
-    Key Features:
-    - File hash for duplicate detection
-    - User-specific file organization
-    - Comprehensive metadata storage
-    - Database indexing for performance
-    """
-    
-    # Foreign key to User model for ownership
     uploaded_by = models.ForeignKey(
         User, 
         on_delete=models.CASCADE, 
         related_name='uploaded_files',
-        db_index=True  # Index for efficient queries by user
+        db_index=True
     )
     
-    # File field with custom upload path and validation
     file = models.FileField(
         upload_to=user_directory_path,
         validators=[validate_file_size, validate_file_type],
         help_text="Upload file (max 100MB)"
     )
     
-    # Original filename as provided by user
     original_filename = models.CharField(
         max_length=255,
         help_text="Original filename as uploaded by user"
@@ -117,6 +105,8 @@ class FileUpload(models.Model):
             models.Index(fields=['original_filename']),
             # Index for file type filtering
             models.Index(fields=['file_type']),
+            # Index for sorting by file size
+            models.Index(fields=['file_size']),
         ]
         verbose_name = "File Upload"
         verbose_name_plural = "File Uploads"
@@ -125,19 +115,12 @@ class FileUpload(models.Model):
         return f"{self.original_filename} (uploaded by {self.uploaded_by.username})"
     
     def save(self, *args, **kwargs):
-        """
-        Override save method to automatically calculate file hash and metadata.
-        This is called before saving to database.
-        """
         if self.file:
-            # Always set file_type from the filename for consistency
             self.file_type = self.get_file_type()
 
-            # Set mime_type if available
             if hasattr(self.file, 'content_type'):
                 self.mime_type = self.file.content_type
 
-            # Calculate hash and size only if not already present (for new files)
             if not self.file_hash:
                 self.file_hash = self.calculate_file_hash()
                 self.file_size = self.file.size
@@ -159,18 +142,11 @@ class FileUpload(models.Model):
         return self.calculate_file_hash_from_file(self.file)
     
     def get_file_type(self):
-        """
-        Extract file type from filename.
-        """
         if '.' in self.original_filename:
             return self.original_filename.split('.')[-1].lower()
         return 'unknown'
     
     def get_file_size_display(self):
-        """
-        Return human-readable file size.
-        Useful for displaying in templates.
-        """
         if self.file_size < 1024:
             return f"{self.file_size} bytes"
         elif self.file_size < 1024**2:
@@ -181,19 +157,12 @@ class FileUpload(models.Model):
             return f"{self.file_size/(1024**3):.1f} GB"
     
     def is_duplicate(self):
-        """
-        Check if this file is a duplicate of an existing file.
-        Used before saving to handle duplicate detection.
-        """
         if not self.file_hash:
             return False
         
         return FileUpload.objects.filter(file_hash=self.file_hash).exists()
     
     def get_duplicate_info(self):
-        """
-        Get information about the original file if this is a duplicate.
-        """
         if not self.is_duplicate():
             return None
         
@@ -205,19 +174,11 @@ class FileUpload(models.Model):
         }
     
     def mark_accessed(self):
-        """
-        Update last_accessed timestamp.
-        Call this when file is downloaded or viewed.
-        """
         self.last_accessed = timezone.now()
         self.save(update_fields=['last_accessed'])
     
     @classmethod
     def get_user_files(cls, user, search_query=None, file_type=None):
-        """
-        Get files for a specific user with optional filtering.
-        This method encapsulates common query patterns.
-        """
         queryset = cls.objects.filter(uploaded_by=user)
         
         if search_query:
@@ -232,10 +193,6 @@ class FileUpload(models.Model):
     
     @classmethod
     def get_file_type_stats(cls, user):
-        """
-        Get file type statistics for a user.
-        Useful for dashboard/analytics.
-        """
         from django.db.models import Count
         
         return cls.objects.filter(uploaded_by=user).values('file_type').annotate(
@@ -244,19 +201,12 @@ class FileUpload(models.Model):
 
 
 class FileAccessLog(models.Model):
-    """
-    Model for logging file access events.
-    This helps in tracking downloads, views, and other interactions.
-    """
-    
-    # Link to the file that was accessed
     file_upload = models.ForeignKey(
         FileUpload,
         on_delete=models.CASCADE,
         related_name='access_logs'
     )
     
-    # User who accessed the file (can be null if anonymous)
     user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -265,23 +215,19 @@ class FileAccessLog(models.Model):
         related_name='file_access_logs'
     )
     
-    # Timestamp of the access event
     timestamp = models.DateTimeField(auto_now_add=True)
     
-    # Type of access (e.g., 'download', 'view')
     access_type = models.CharField(
         max_length=50,
         default='view',
         db_index=True
     )
     
-    # IP address of the user
     ip_address = models.GenericIPAddressField(
         null=True,
         blank=True
     )
     
-    # User agent string from the request
     user_agent = models.TextField(
         null=True,
         blank=True
