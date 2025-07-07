@@ -13,18 +13,18 @@ export const useFiles = () => {
     const [uploadReport, setUploadReport] = useState<{ successful: any[]; failed: any[] } | null>(null);
     const { addToast } = useToast();
 
-    // Store the base search parameters, without pagination cursors.
-    const [baseSearchParams, setBaseSearchParams] = useState<SearchParams>({});
+    const [currentSearchParams, setCurrentSearchParams] = useState<SearchParams>({});
 
     const searchFiles = useCallback(async (params: SearchParams) => {
         setLoading(true);
-        // If this is a new search (no cursor), update the base search params.
-        if (params.cursor === undefined) {
-            const { page, page_size, ...baseParams } = params;
-            setBaseSearchParams(baseParams);
-        }
+        // A new search resets pagination and stores the new filter state.
+        const newSearch = { ...params };
+        delete newSearch.cursor;
+        delete newSearch.page;
+        setCurrentSearchParams(newSearch);
+
         try {
-            const data = await fileService.searchFiles(params);
+            const data = await fileService.searchFiles(newSearch);
             setFileData(data);
         } catch (err) {
             addToast('Failed to fetch files.', 'error');
@@ -40,29 +40,36 @@ export const useFiles = () => {
         setLoading(true);
         try {
             const urlParams = new URL(url).searchParams;
-            const params: SearchParams = {};
-            for (const [key, value] of urlParams.entries()) {
-                params[key] = value;
+            const paginationParams: SearchParams = {};
+            const cursor = urlParams.get('cursor');
+            if (cursor) {
+                paginationParams.cursor = cursor;
             }
-            // searchFiles will call the service and update state
-            await searchFiles(params);
+            const page = urlParams.get('page');
+            if (page) {
+                paginationParams.page = parseInt(page, 10);
+            }
+
+            // Combine the stored filters with the new page/cursor for the request.
+            const paramsToFetch = { ...currentSearchParams, ...paginationParams };
+            const data = await fileService.searchFiles(paramsToFetch);
+            setFileData(data);
         } catch (err) {
             addToast('Failed to fetch page.', 'error');
             console.error(err);
         } finally {
             setLoading(false);
         }
-    }, [searchFiles, addToast]);
+    }, [addToast, currentSearchParams]);
 
-    // Initial fetch
+    // Initial fetch on component mount.
     useEffect(() => {
         searchFiles({});
     }, [searchFiles]);
 
     const refreshCurrentView = useCallback(() => {
-        // Refresh by re-running the base search, which gets the first page.
-        searchFiles(baseSearchParams);
-    }, [searchFiles, baseSearchParams]);
+        searchFiles(currentSearchParams);
+    }, [searchFiles, currentSearchParams]);
 
     const uploadFile = async (file: File) => {
         setLoading(true);
@@ -91,28 +98,63 @@ export const useFiles = () => {
         }
     };
 
+    const getErrorMessage = (error: any): string => {
+        if (typeof error === 'string') {
+            return error;
+        }
+        if (typeof error === 'object' && error !== null) {
+            // This handles serializer errors which are often nested, e.g., { file: ["error message"] }
+            const messages = Object.values(error).flat();
+            return messages.join(' ');
+        }
+        return 'An unknown error occurred.';
+    };
+
     const bulkUploadFiles = async (files: File[]) => {
         setLoading(true);
         setProgress(0);
         setUploadReport(null);
 
+        const formData = new FormData();
+        files.forEach(file => formData.append('files', file));
+
         try {
-            const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('files', files[i]);
-            }
             const response = await fileService.bulkUploadFiles(formData, (progressEvent: ProgressEvent) => {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total ?? 1));
                 setProgress(percentCompleted);
             });
-            addToast(response.data.message, 'success');
-            setUploadReport({
-                successful: response.data.successful_uploads,
-                failed: response.data.failed_uploads
+
+            const { successful_uploads, failed_uploads, message } = response.data;
+
+            // Show a summary toast
+            addToast(message, failed_uploads.length > 0 ? 'warning' : 'success');
+
+            // Show specific toasts for failures
+            failed_uploads.forEach((failure: { filename: string; error: any }) => {
+                const errorMessage = getErrorMessage(failure.error);
+                addToast(`Failed: ${failure.filename} - ${errorMessage}`, 'error');
             });
-            refreshCurrentView();
+
+            setUploadReport({ successful: successful_uploads, failed: failed_uploads });
+
+            if (successful_uploads.length > 0) {
+                refreshCurrentView();
+            }
+
         } catch (err) {
-            addToast('Failed to upload files.', 'error');
+            if (err instanceof AxiosError && err.response?.data) {
+                const { failed_uploads, message } = err.response.data;
+                addToast(message || 'An error occurred during bulk upload.', 'error');
+                
+                if (failed_uploads && Array.isArray(failed_uploads)) {
+                    failed_uploads.forEach((failure: { filename: string; error: any }) => {
+                        const errorMessage = getErrorMessage(failure.error);
+                        addToast(`Failed: ${failure.filename} - ${errorMessage}`, 'error');
+                    });
+                }
+            } else {
+                addToast('A network or server error occurred.', 'error');
+            }
             console.error(err);
         } finally {
             setLoading(false);
@@ -124,8 +166,6 @@ export const useFiles = () => {
         try {
             await fileService.deleteFile(fileId);
             addToast('File deleted successfully.', 'success');
-            // After deleting, refresh the list using the base search parameters.
-            // This will show the first page of the current search.
             refreshCurrentView();
         } catch (err) {
             addToast('Failed to delete file.', 'error');

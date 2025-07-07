@@ -1,8 +1,8 @@
 // src/utils/types.ts
 
 export interface ProgressEvent {
-  loaded: number;
-  total: number;
+    loaded: number;
+    total: number;
 }
 
 export interface User {
@@ -13,35 +13,34 @@ export interface User {
 
 export interface FileUpload {
     id: number;
-    file: string;
     original_filename: string;
-    description: string;
+    description?: string;
     file_type: string;
     file_size: number;
+    file_size_display: string;
     upload_date: string;
-    last_accessed: string;
-    view_count: number;
-    is_duplicate: boolean;
-    permissions?: {
-        can_download: boolean;
-
-        can_delete: boolean;
-    };
-    uploaded_by: User;
+    last_accessed: string | null;
+    file_url: string;
+    content_preview_url?: string;
+    uploaded_by: string;
 }
 
 
 
 export interface SearchParams {
     [key: string]: any;
-    query?: string;
-    file_type?: string[];
+    search?: string;
+    file_types?: string[];
     start_date?: string;
     end_date?: string;
-    size_min?: number;
-    size_max?: number;
+    min_size?: number;
+    max_size?: number;
     page?: number;
     page_size?: number;
+    cursor?: string;
+    detailed?: boolean;
+    preview?: boolean;
+    include?: string[];
 }
 
 export interface PaginatedResponse<T> {
