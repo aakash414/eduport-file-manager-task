@@ -1,4 +1,3 @@
-// src/services/fileService.ts
 import api from './api';
 import type { FileUpload, PaginatedResponse, SearchParams } from '../utils/types.ts';
 import qs from 'qs';
@@ -61,25 +60,6 @@ export const downloadFile = async (fileId: number) => {
     const response = await api.get(`/files/${fileId}/download/`, {
         responseType: 'blob',
     });
-    return response.data;
-};
-
-
-
-export const getFileStats = async () => {
-    const response = await api.get('/files/stats/');
-    return response.data;
-};
-
-export const cleanupOrphanedFiles = async (dryRun = false) => {
-    const response = await api.post('/files/cleanup/orphaned/', { dry_run: dryRun });
-    return response.data;
-};
-
-
-
-export const cleanupOldLogs = async (days: number, dryRun = false) => {
-    const response = await api.post('/files/cleanup/old-logs/', { days, dry_run: dryRun });
     return response.data;
 };
 

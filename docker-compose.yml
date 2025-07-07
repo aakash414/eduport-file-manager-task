@@ -6,6 +6,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
+      - TZ=Asia/Kolkata
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -37,6 +38,8 @@ services:
       - media_data:/home/appuser/app/media
       - static_data:/home/appuser/app/static
 
+    environment:
+      - TZ=Asia/Kolkata
     env_file:
       - .env
     depends_on:
@@ -65,6 +68,8 @@ services:
     volumes:
       - ./frontend/src:/app/src
       - media_data:/usr/share/nginx/html/media
+    environment:
+      - TZ=Asia/Kolkata
     depends_on:
       backend:
         condition: service_healthy

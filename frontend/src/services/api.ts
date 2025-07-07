@@ -1,4 +1,3 @@
-// src/services/api.ts
 import axios from 'axios';
 
 const api = axios.create({
@@ -9,7 +8,6 @@ const api = axios.create({
     },
 });
 
-// Function to get CSRF token from cookies
 function getCookie(name: string): string | null {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -25,7 +23,6 @@ function getCookie(name: string): string | null {
     return cookieValue;
 }
 
-// Use a request interceptor to attach the CSRF token to every request.
 api.interceptors.request.use(config => {
     const csrfToken = getCookie('csrftoken');
     if (csrfToken) {
