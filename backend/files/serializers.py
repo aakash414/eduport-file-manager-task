@@ -10,14 +10,10 @@ class BulkFileUploadSerializer(serializers.Serializer):
     )
 
     def validate_files(self, files):
-        """
-        Validates a list of uploaded files.
-        """
         if not files:
             raise serializers.ValidationError("No files were submitted.")
 
-        # Get upload limits from Django settings, with defaults.
-        max_upload_size = getattr(settings, "MAX_UPLOAD_SIZE", 2621440)  # Default: 2.5MB
+        max_upload_size = getattr(settings, "MAX_UPLOAD_SIZE", 10485760)  # Default: 10MB
         allowed_file_types = getattr(settings, "ALLOWED_FILE_TYPES", [
             'image/jpeg',
             'image/png',
@@ -25,14 +21,12 @@ class BulkFileUploadSerializer(serializers.Serializer):
         ])
 
         for file in files:
-            # Validate file size
             if file.size > max_upload_size:
                 raise serializers.ValidationError(
                     f"File '{file.name}' exceeds the maximum upload size of "
                     f"{max_upload_size // 1024 // 1024}MB."
                 )
             
-            # Validate file type
             if file.content_type not in allowed_file_types:
                 raise serializers.ValidationError(
                     f"File type '{file.content_type}' is not allowed for '{file.name}'. "
@@ -47,24 +41,13 @@ from django.core.exceptions import ValidationError
 
 
 class FileUploadSerializer(serializers.ModelSerializer):
-    """
-    Serializer for file uploads with comprehensive validation.
     
-    Interview Talking Points:
-    - Custom validation for file types and sizes
-    - Duplicate detection using file hashing
-    - Security considerations for file uploads
-    - Performance optimization with selective field updates
-    """
-    
-    # Read-only fields that are auto-generated
     file_hash = serializers.CharField(read_only=True)
     file_size = serializers.IntegerField(read_only=True)
     file_type = serializers.CharField(read_only=True)
     upload_date = serializers.DateTimeField(read_only=True)
     uploaded_by = serializers.StringRelatedField(read_only=True)
     
-    # Display fields for better API responses
     file_size_display = serializers.CharField(source='get_file_size_display', read_only=True)
     file_url = serializers.SerializerMethodField()
     is_duplicate = serializers.SerializerMethodField()
@@ -95,19 +78,16 @@ class FileUploadSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("No file provided.")
         
-        # File size validation (100MB limit)
         max_size = 100 * 1024 * 1024  # 100MB
         if value.size > max_size:
             raise serializers.ValidationError(
                 f"File size ({value.size} bytes) exceeds maximum allowed size ({max_size} bytes)."
             )
         
-        # File type validation
         allowed_extensions = [
             'pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'gif',
             'mp4', 'avi', 'mov', 'zip', 'rar', 'csv', 'xlsx', 'xls', 'mp3'
         ]
-        print(f"DEBUG: Allowed extensions at runtime: {allowed_extensions}")
         
         file_extension = value.name.split('.')[-1].lower() if '.' in value.name else ''
         if file_extension not in allowed_extensions:
@@ -116,7 +96,6 @@ class FileUploadSerializer(serializers.ModelSerializer):
                 f"Allowed types: {', '.join(allowed_extensions)}"
             )
         
-        # Security: Check for potentially malicious files
         dangerous_extensions = ['exe', 'bat', 'cmd', 'com', 'pif', 'scr', 'vbs', 'js']
         if file_extension in dangerous_extensions:
             raise serializers.ValidationError(
@@ -126,19 +105,14 @@ class FileUploadSerializer(serializers.ModelSerializer):
         return value
     
     def validate_original_filename(self, value):
-        """
-        Validate filename for security.
-        """
         if not value:
             raise serializers.ValidationError("Original filename is required.")
         
-        # Security: Prevent directory traversal attacks
         if '..' in value or '/' in value or '\\' in value:
             raise serializers.ValidationError(
                 "Filename contains invalid characters."
             )
         
-        # Length validation
         if len(value) > 255:
             raise serializers.ValidationError(
                 "Filename is too long (maximum 255 characters)."
@@ -147,30 +121,16 @@ class FileUploadSerializer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
-        """
-        Create file upload with duplicate detection.
-        
-        Interview Talking Points:
-        - Duplicate detection strategy
-        - Atomic operations for data integrity
-        - Error handling for edge cases
-        """
-        # Set the user from the request context
         request = self.context.get('request')
         if request and request.user:
             validated_data['uploaded_by'] = request.user
         
-        # Set original filename from the uploaded file if not provided
         if 'original_filename' not in validated_data and 'file' in validated_data:
             validated_data['original_filename'] = validated_data['file'].name
         
-        # Create the instance (file hash will be calculated in model's save method)
         instance = super().create(validated_data)
         
-        # Check for duplicates after creation
         if self.get_is_duplicate(instance):
-            # Log duplicate for analytics (optional)
-            # logger.info(f"Duplicate file uploaded: {instance.file_hash}")
             pass
         
         return instance
