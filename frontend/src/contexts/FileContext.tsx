@@ -1,4 +1,3 @@
-// src/contexts/FileContext.tsx
 import { createContext, useContext, type ReactNode } from 'react';
 import { useFiles } from '../hooks/useFiles';
 import type { SearchParams, FileUpload, PaginatedResponse } from '../utils/types';

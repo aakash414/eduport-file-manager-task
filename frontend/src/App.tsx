@@ -4,7 +4,6 @@ import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import Layout from './components/layout/Layout';
-import NotFound from './pages/NotFound';
 import { ToastProvider } from './context/ToastContext';
 import './App.css';
 

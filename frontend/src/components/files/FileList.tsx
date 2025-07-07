@@ -54,8 +54,8 @@ export const FileList: React.FC = () => {
     };
 
     const handleSelectFile = (fileId: number) => {
-        setSelectedFiles(prev => 
-            prev.includes(fileId) 
+        setSelectedFiles(prev =>
+            prev.includes(fileId)
                 ? prev.filter(id => id !== fileId)
                 : [...prev, fileId]
         );
@@ -110,29 +110,27 @@ export const FileList: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex-1">
-                            <div className="relative">
+                            <div className="flex-1">
+                                <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                                 <input
+                                    id="start-date"
                                     type="date"
                                     value={startDateInput}
                                     onChange={(e) => setStartDateInput(e.target.value)}
                                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
-                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                    Start Date
-                                </span>
                             </div>
                         </div>
                         <div className="flex-1">
-                            <div className="relative">
+                            <div className="flex-1">
+                                <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                                 <input
+                                    id="end-date"
                                     type="date"
                                     value={endDateInput}
                                     onChange={(e) => setEndDateInput(e.target.value)}
                                     className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
-                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                    End Date
-                                </span>
                             </div>
                         </div>
                     </div>

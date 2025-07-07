@@ -36,7 +36,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile, onToggl
     };
 
     return (
-        <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewFile(file.id)}>
+        <tr className="hover:bg-gray-50 cursor-pointer" >
             <td className="px-6 py-4 whitespace-nowrap">
                 <input
                     type="checkbox"
@@ -45,7 +45,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile, onToggl
                     className="mr-4"
                 />
             </td>
-            <td className="px-6 py-4 whitespace-nowrap">
+            <td className="px-6 py-4 whitespace-nowrap" onClick={() => onViewFile(file.id)}>
                 <div className="font-medium text-gray-900">{file.original_filename}</div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-gray-500">

@@ -7,7 +7,6 @@ from .models import FileUpload, FileAccessLog
 
 @admin.register(FileUpload)
 class FileUploadAdmin(admin.ModelAdmin):
-    # List view configuration
     list_display = [
         'original_filename',
         'uploaded_by',
@@ -31,7 +30,6 @@ class FileUploadAdmin(admin.ModelAdmin):
         'file_hash',
     ]
     
-    # Detail view configuration
     fieldsets = (
         ('File Information', {
             'fields': ('file', 'original_filename', 'description')
@@ -57,14 +55,11 @@ class FileUploadAdmin(admin.ModelAdmin):
         'last_accessed'
     ]
     
-    # Pagination
     list_per_page = 25
     
-    # Ordering
     ordering = ['-upload_date']
     
     def has_duplicates(self, obj):
-        """Check if file has duplicates."""
         count = FileUpload.objects.filter(file_hash=obj.file_hash).count()
         if count > 1:
             return format_html(
@@ -75,7 +70,6 @@ class FileUploadAdmin(admin.ModelAdmin):
     has_duplicates.short_description = 'Has Duplicates'
     
     def download_link(self, obj):
-        """Provide download link for the file."""
         if obj.file:
             return format_html(
                 '<a href="{}" target="_blank">Download</a>',
@@ -85,14 +79,11 @@ class FileUploadAdmin(admin.ModelAdmin):
     download_link.short_description = 'Download'
     
     def get_queryset(self, request):
-        """Optimize queryset with select_related."""
         return super().get_queryset(request).select_related('uploaded_by')
     
-    # Custom actions
     actions = ['mark_as_accessed', 'show_duplicate_info']
     
     def mark_as_accessed(self, request, queryset):
-        """Mark selected files as accessed."""
         updated = 0
         for obj in queryset:
             obj.mark_accessed()
@@ -105,7 +96,6 @@ class FileUploadAdmin(admin.ModelAdmin):
     mark_as_accessed.short_description = 'Mark selected files as accessed'
     
     def show_duplicate_info(self, request, queryset):
-        """Show duplicate information for selected files."""
         for obj in queryset:
             if obj.is_duplicate():
                 info = obj.get_duplicate_info()
