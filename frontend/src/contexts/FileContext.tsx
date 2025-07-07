@@ -1,18 +1,20 @@
 // src/contexts/FileContext.tsx
 import { createContext, useContext, type ReactNode } from 'react';
 import { useFiles } from '../hooks/useFiles';
-import type { SearchParams } from '../utils/types';
+import type { SearchParams, FileUpload, PaginatedResponse } from '../utils/types';
 
 interface FileContextType {
-    fileData: ReturnType<typeof useFiles>['fileData'];
+    fileData: PaginatedResponse<FileUpload> | null;
     loading: boolean;
     progress: number;
     uploadReport: { successful: any[]; failed: any[] } | null;
-    fetchPage: (url: string | null) => void;
-    uploadFile: (file: File) => void;
-    bulkUploadFiles: (files: File[]) => void;
-    deleteFile: (fileId: number) => void;
-    searchFiles: (params: SearchParams) => void;
+    uploadFile: (file: File) => Promise<void>;
+    bulkUploadFiles: (files: File[]) => Promise<void>;
+    deleteFile: (fileId: number) => Promise<void>;
+    searchFiles: (params: SearchParams) => Promise<void>;
+    fetchPage: (url: string | null) => Promise<void>;
+    refreshCurrentView: () => void;
+    bulkDeleteFiles: (fileIds: number[]) => Promise<void>;
 }
 
 const FileContext = createContext<FileContextType | undefined>(undefined);
@@ -27,7 +29,9 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
         uploadFile,
         bulkUploadFiles,
         deleteFile,
-        searchFiles
+        searchFiles,
+        bulkDeleteFiles,
+        refreshCurrentView
     } = useFiles();
 
     return (
@@ -40,7 +44,9 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
             uploadFile,
             bulkUploadFiles,
             deleteFile,
-            searchFiles
+            searchFiles,
+            bulkDeleteFiles,
+            refreshCurrentView
         }}>
             {children}
         </FileContext.Provider>

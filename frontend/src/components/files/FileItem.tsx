@@ -8,9 +8,11 @@ interface FileItemProps {
     file: FileUpload;
     onDelete: (fileId: number) => void;
     onViewFile: (fileId: number) => void;
+    onToggleSelect: (fileId: number) => void;
+    isSelected: boolean;
 }
 
-const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile }) => {
+const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile, onToggleSelect, isSelected }) => {
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (window.confirm(`Are you sure you want to delete ${file.original_filename}?`)) {
@@ -36,6 +38,14 @@ const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile }) => {
     return (
         <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewFile(file.id)}>
             <td className="px-6 py-4 whitespace-nowrap">
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleSelect(file.id)}
+                    className="mr-4"
+                />
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
                 <div className="font-medium text-gray-900">{file.original_filename}</div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-gray-500">
@@ -49,7 +59,7 @@ const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile }) => {
             <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                 {format(new Date(file.upload_date), 'MMM dd, yyyy')}
             </td>
-            <td className="px-6 py-4 whitespace-nowrap text-right font-medium">
+            <td className="px-2 py-4 whitespace-nowrap text-right font-medium">
                 <div className="flex items-center justify-around space-x-4">
                     <button onClick={() => onViewFile(file.id)} className="text-gray-500 hover:text-blue-600">
                         <FiEye className="w-5 h-5" />

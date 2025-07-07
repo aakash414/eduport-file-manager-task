@@ -1,187 +1,83 @@
-# Eduport - File Manager
+# File Management System
 
-This is a file manager application built with a React frontend and a Django backend.
+This project is a comprehensive file management system built to fulfill the requirements of the provided technical assessment. It features a Django backend and a React frontend, containerized with Docker for setup and deployment.
+
+## Core Features & Implementation Choices
+
+This section details the implementation of each required feature, explaining the technical decisions made.
+
+### 1. User Authentication
+
+-   **Technology:** Implemented using Django's built-in session authentication.
+
+### 2. File Upload & Duplicate Prevention
+
+-   **Technology:** File uploads are handled through a REST API endpoint. Duplicate prevention is done using a SHA-256 hash of the file's content upon upload.
+-   **Implementation:**
+    -   The `FileUpload` model has a `file_hash` field with a `unique=True` constraint at the database level. This guarantees that no two records can have the same file hash, ensuring data integrity.
+    -   Before saving a new file, its SHA-256 hash is computed in chunks to handle large files efficiently without consuming excessive memory.
+    -   If a file with the same hash already exists, the database will raise an `IntegrityError`. The `FileUploadView` catches this specific error and returns a `409 Conflict` response to the client, indicating that the file is a duplicate.
+-   **Reasoning:** This hash-based approach is highly effective for preventing duplicate file uploads. Using a database-level `unique` constraint is the most reliable way to enforce this rule.
+
+### 3. File Management
+
+-   **List & Search:**
+    -   **Technology:** The file list is exposed via a paginated API endpoint. The search functionality allows filtering by filename, file type, and upload date.
+    -   **Optimization:**
+        -   **Database Indexing:** I've added database indexes to the `FileUpload` model on fields that are frequently used in queries, such as `uploaded_by`, `upload_date`, `file_type`, and `file_hash`. This significantly improves the performance of filtering and sorting operations.
+        -   **Pagination:** I chose `CursorPagination` for the file list endpoint. It's more efficient for large datasets than traditional page number pagination, as it avoids expensive `COUNT` queries.
+        -   **Caching:** I've implemented a caching layer using Redis. The file list and file type endpoints are cached to reduce database load and provide a faster response to the user. The cache is intelligently invalidated whenever a file is uploaded, updated, or deleted.
+
+-   **Delete:**
+    -   **Implementation:** Users can delete their own files via a `DELETE` request to the file's API endpoint. The backend ensures that users can only delete files they have uploaded.
+
+### 4. API Documentation
+
+-   **Technology:** I've used `drf-spectacular` to generate OpenAPI 3 documentation for the backend API.
+-   **Reasoning:** Providing clear API documentation is crucial for any project. `drf-spectacular` automatically generates a comprehensive and interactive Swagger UI, which makes it easy to explore and test the API endpoints. The documentation is available at the `/api/docs/` endpoint.
+
+## Bonus: Deployment with Docker
+
+-   **Technology:** The entire application (backend, frontend, database, and Redis) is containerized using Docker and orchestrated with Docker Compose.
+-   **Reasoning:**
+    -   **Consistency:** Docker ensures that the application runs in a consistent environment, eliminating the "it works on my machine" problem.
+    -   **Ease of Use:** With a single `docker-compose up` command, the entire stack is provisioned and started. This simplifies the setup process for both development and production.
+    -   **Scalability:** The containerized setup makes it easy to scale individual components of the application in the future.
 
 ## Getting Started
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
-
 ### Prerequisites
 
-- [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
-- [Node.js](https://nodejs.org/en/download/) (v18 or later)
-- [Python](https://www.python.org/downloads/) (v3.10 or later)
-- [Poetry](https://python-poetry.org/docs/#installation) (for backend local development)
+-   [Docker](https://www.docker.com/get-started)
+-   [Docker Compose](https://docs.docker.com/compose/install/)
 
-## Docker
-
-The recommended way to run this project is using Docker.
-
-### Running the application
+### Running the Application
 
 1.  **Clone the repository:**
-
     ```bash
     git clone https://github.com/your-username/eduport-file-manager.git
     cd eduport-file-manager
     ```
 
 2.  **Create an environment file:**
-
-    Create a `.env` file in the root of the project and add the following environment variables:
-
-    ```env
-    POSTGRES_DB=eduport
-    POSTGRES_USER=user
-    POSTGRES_PASSWORD=password
+    ```bash
+    cp .env.example .env
     ```
+    Update the `.env` file with a new `SECRET_KEY`.
 
-3.  **Build and run the application:**
-
+3.  **Build and run with Docker Compose:**
     ```bash
     docker-compose up --build
     ```
 
-    The application will be available at the following URLs:
+The application will be available at:
 
-    -   **Frontend:** [http://localhost:3000](http://localhost:3000)
-    -   **Backend:** [http://localhost:8000](http://localhost:8000)
+-   **Frontend:** [http://localhost:3000](http://localhost:3000)
+-   **Backend API:** [http://localhost:8000/api/](http://localhost:8000/api/)
+-   **API Docs:** [http://localhost:8000/api/docs/](http://localhost:8000/api/docs/)
 
-### Stopping the application
-
-To stop the application, press `Ctrl+C` in the terminal where `docker-compose` is running, and then run:
+### Stopping the Application
 
 ```bash
 docker-compose down
 ```
-
-## Local Development
-
-If you prefer to run the frontend and backend separately without Docker, follow these instructions.
-
-### Backend
-
-1.  **Navigate to the backend directory:**
-
-    ```bash
-    cd backend
-    ```
-
-2.  **Create a virtual environment and install dependencies:**
-
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    pip install -r requirements.txt
-    ```
-
-3.  **Create an environment file:**
-
-    Create a `.env` file in the `backend` directory and add the following environment variables:
-
-    ```env
-    DATABASE_URL=postgres://user:password@localhost:5432/eduport
-    ```
-
-4.  **Run database migrations:**
-
-    ```bash
-    python manage.py migrate
-    ```
-
-5.  **Run the development server:**
-
-    ```bash
-    python manage.py runserver
-    ```
-
-    The backend will be running at [http://localhost:8000](http://localhost:8000).
-
-### Frontend
-
-1.  **Navigate to the frontend directory:**
-
-    ```bash
-    cd frontend
-    ```
-
-2.  **Install dependencies:**
-
-    ```bash
-    npm install
-    ```
-
-3.  **Run the development server:**
-
-    ```bash
-    npm run dev
-    ```
-
-    The frontend will be running at [http://localhost:3000](http://localhost:3000).
-
-## Environment Variables
-
-The following environment variables are used by the application:
-
--   `POSTGRES_DB`: The name of the PostgreSQL database.
--   `POSTGRES_USER`: The username for the PostgreSQL database.
--   `POSTGRES_PASSWORD`: The password for the PostgreSQL database.
--   `DATABASE_URL`: The connection string for the PostgreSQL database (used in local development).
-
-## Technologies Used
-
--   **Frontend:**
-    -   [React](https://reactjs.org/)
-    -   [Vite](https://vitejs.dev/)
-    -   [TypeScript](https://www.typescriptlang.org/)
-    -   [ESLint](https://eslint.org/)
--   **Backend:**
-    -   [Django](https://www.djangoproject.com/)
-    -   [Django REST Framework](https://www.django-rest-framework.org/)
-    -   [PostgreSQL](https://www.postgresql.org/)
-    -   [Gunicorn](https://gunicorn.org/)
--   **DevOps:**
-    -   [Docker](https://www.docker.com/)
-    -   [Docker Compose](https://docs.docker.com/compose/)
-
-## Project Structure
-
-```
-.
-├── backend
-│   ├── Dockerfile
-│   ├── manage.py
-│   ├── requirements.txt
-│   ├── file_manager
-│   ├── files
-│   └── users
-├── frontend
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── src
-│   └── public
-├── .gitignore
-├── docker-compose.yml
-└── README.md
-```
-
-## API Endpoints
-
-The backend provides the following API endpoints:
-
--   `GET /api/files/`: List all files.
--   `POST /api/files/`: Upload a new file.
--   `GET /api/files/<id>/`: Retrieve a specific file.
--   `PUT /api/files/<id>/`: Update a specific file.
--   `DELETE /api/files/<id>/`: Delete a specific file.
-
--   `POST /api/users/register/`: Register a new user.
--   `POST /api/users/login/`: Log in a user.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a pull request.
-
-## License
-
-This project is licensed under the MIT License.
