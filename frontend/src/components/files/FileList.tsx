@@ -9,9 +9,9 @@ import { getFileTypes } from '../../services/fileService';
 
 export const FileList: React.FC = () => {
     const { fileData, loading, fetchPage, deleteFile, searchFiles } = useFileContext();
-    const [viewingFileId, setViewingFileId] = useState<number | null>(null);
+    const [previewingFileIndex, setPreviewingFileIndex] = useState<number | null>(null);
 
-    const [currentParams, setCurrentParams] = useState<SearchParams>({});
+
 
     const [queryInput, setQueryInput] = useState('');
     const [startDateInput, setStartDateInput] = useState('');
@@ -46,36 +46,21 @@ export const FileList: React.FC = () => {
         };
     }, []);
 
-    // A simple, stable, debounced version of the searchFiles function.
-    const debouncedSearch = useCallback(debounce(searchFiles, 300), [searchFiles]);
+    const debouncedSearch = useCallback(debounce(searchFiles, 500), [searchFiles]);
 
     useEffect(() => {
         const params: SearchParams = {
-            query: queryInput || undefined,
-            file_type: selectedFileTypes.length > 0 ? selectedFileTypes : undefined,
+            search: queryInput || undefined,
+            file_types: selectedFileTypes.length > 0 ? selectedFileTypes : undefined,
             start_date: startDateInput || undefined,
             end_date: endDateInput || undefined,
         };
-
-        // Check if any filter is currently active
-        const isAnyFilterActive = Object.values(params).some(
-            (value) => value !== undefined && (Array.isArray(value) ? value.length > 0 : value !== '')
-        );
-
-        if (isAnyFilterActive) {
-            // If filters are active, call the debounced search and update the current params
-            debouncedSearch(params);
-            setCurrentParams(params);
-        } else if (Object.keys(currentParams).length > 0) {
-            // If no filters are active, but there *were* active filters before, clear them.
-            debouncedSearch({});
-            setCurrentParams({});
-        }
+        debouncedSearch(params);
 
         return () => {
             debouncedSearch.cancel();
         };
-    }, [queryInput, selectedFileTypes, startDateInput, endDateInput, debouncedSearch, currentParams]);
+    }, [queryInput, selectedFileTypes, startDateInput, endDateInput, debouncedSearch]);
 
 
     const handleFileTypeChange = (fileType: string) => {
@@ -91,12 +76,11 @@ export const FileList: React.FC = () => {
         setSelectedFileTypes([]);
         setStartDateInput('');
         setEndDateInput('');
-        // The useEffect will now handle the logic to refetch the data.
+
     };
 
     const handleDeleteFile = async (fileId: number) => {
         await deleteFile(fileId);
-        // The view is now automatically refreshed by the useFiles hook
     };
 
     const handleNextPage = () => {
@@ -107,18 +91,15 @@ export const FileList: React.FC = () => {
         fetchPage(fileData?.previous ?? null);
     };
 
-    const fileIds = fileData?.results?.map(f => f.id) || [];
-    const currentFileIndex = viewingFileId ? fileIds.indexOf(viewingFileId) : -1;
-
     const handleNext = () => {
-        if (currentFileIndex !== -1 && currentFileIndex < fileIds.length - 1) {
-            setViewingFileId(fileIds[currentFileIndex + 1]);
+        if (previewingFileIndex !== null && fileData && previewingFileIndex < fileData.results.length - 1) {
+            setPreviewingFileIndex(previewingFileIndex + 1);
         }
     };
 
     const handlePrevious = () => {
-        if (currentFileIndex > 0) {
-            setViewingFileId(fileIds[currentFileIndex - 1]);
+        if (previewingFileIndex !== null && previewingFileIndex > 0) {
+            setPreviewingFileIndex(previewingFileIndex - 1);
         }
     };
 
@@ -176,6 +157,7 @@ export const FileList: React.FC = () => {
                         Clear
                     </button>
                 </div>
+
             </div>
 
             <div className="overflow-x-auto">
@@ -185,7 +167,7 @@ export const FileList: React.FC = () => {
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Modified</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Uploaded</th>
                             <th scope="col" className="relative px-6 py-3">
                                 <span className="sr-only">Actions</span>
                             </th>
@@ -197,12 +179,12 @@ export const FileList: React.FC = () => {
                         ) : fileData?.results?.length === 0 ? (
                             <tr><td colSpan={5} className="text-center py-12 text-gray-500">No files found.</td></tr>
                         ) : (
-                            fileData?.results?.map(file => (
+                            fileData?.results?.map((file, index) => (
                                 <FileItem
                                     key={file.id}
                                     file={file}
                                     onDelete={handleDeleteFile}
-                                    onViewFile={() => setViewingFileId(file.id)}
+                                    onViewFile={() => setPreviewingFileIndex(index)}
                                 />
                             ))
                         )}
@@ -229,14 +211,13 @@ export const FileList: React.FC = () => {
                 </div>
             )}
 
-            {viewingFileId && (
+            {previewingFileIndex !== null && fileData?.results && (
                 <FilePreviewModal
-                    fileId={viewingFileId}
-                    onClose={() => setViewingFileId(null)}
+                    files={fileData.results}
+                    currentIndex={previewingFileIndex}
+                    onClose={() => setPreviewingFileIndex(null)}
                     onNext={handleNext}
                     onPrevious={handlePrevious}
-                    hasNext={currentFileIndex < fileIds.length - 1}
-                    hasPrevious={currentFileIndex > 0}
                 />
             )}
         </div>
