@@ -1,6 +1,6 @@
 # File Manager - Web App
 
-A simple file management system built with Django and React. Users can upload files, manage them, and share them with others.
+A simple file management system built with Django and React. Users can upload and manage files.
 
 ## What It Does
 
