@@ -65,6 +65,13 @@ export const useFiles = () => {
 
     const uploadFile = useCallback(async (file: File) => {
         if (!isAuthenticatedRef.current) return;
+
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        if (file.size > MAX_FILE_SIZE) {
+            addToast(`File size cannot exceed ${MAX_FILE_SIZE / 1024 / 1024}MB.`, 'error');
+            return;
+        }
+
         setLoading(true);
         setProgress(0);
 
@@ -85,12 +92,27 @@ export const useFiles = () => {
 
     const bulkUploadFiles = async (files: File[]) => {
         if (!isAuthenticatedRef.current) return;
+
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const validFiles = files.filter(file => {
+            if (file.size > MAX_FILE_SIZE) {
+                addToast(`'${file.name}' exceeds the size limit of 10MB and was not uploaded.`, 'error');
+                return false;
+            }
+            return true;
+        });
+
+        if (validFiles.length === 0) {
+            addToast('No valid files to upload.', 'warning');
+            return;
+        }
+
         setLoading(true);
         setProgress(0);
         setUploadReport(null);
 
         const formData = new FormData();
-        files.forEach(file => formData.append('files', file));
+        validFiles.forEach(file => formData.append('files', file));
 
         try {
             const response = await fileService.bulkUploadFiles(formData, (progressEvent: ProgressEvent) => {
