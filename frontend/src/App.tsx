@@ -6,6 +6,7 @@ import PublicRoute from './components/PublicRoute';
 import Layout from './components/layout/Layout';
 import { ToastProvider } from './context/ToastContext';
 import './App.css';
+import NotFound from './pages/NotFound';
 
 function App() {
     return (
@@ -25,7 +26,7 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
-                <Route path="*" element={<PublicRoute><AuthPage /></PublicRoute>} />
+                <Route path="*" element={<NotFound />} />
             </Routes>
         </ToastProvider>
     );

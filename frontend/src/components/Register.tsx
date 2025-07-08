@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import apiClient from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 
 interface RegisterError {
@@ -20,7 +21,7 @@ const Register: React.FC = () => {
         e.preventDefault();
         setErrors({});
         try {
-            await axios.post('http://localhost:8000/api/users/register/', {
+            await apiClient.post('/users/register/', {
                 username,
                 email,
                 password,

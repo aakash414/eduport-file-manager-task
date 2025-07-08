@@ -38,20 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 def invalidate_user_file_cache(user):
-    """
-    Invalidates all file-related caches for a given user by bumping a version number.
-    This is an atomic and efficient way to invalidate caches.
-    """
     version_key = f'user_{user.id}_file_list_version'
     try:
-        # Atomically increment the version number.
         cache.incr(version_key)
     except ValueError:
-        # If the key doesn't exist, `incr` fails. We initialize it.
-        # The default version in FileListView is 1, so we start invalidation at 2.
-        cache.set(version_key, 2, timeout=None)  # No timeout, should persist
-
-    # Also clear the separate file types cache.
+        cache.set(version_key, 2, timeout=None)
     cache.delete(f'user_{user.id}_file_types')
     logger.info(f"Invalidated file cache for user {user.id}")
 

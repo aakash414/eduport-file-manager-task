@@ -19,14 +19,6 @@ services:
       timeout: 10s
       retries: 3
 
-  redis:
-    image: redis:alpine
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
   backend:
     build:
       context: ./backend
@@ -45,10 +37,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/files/health/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -57,7 +47,7 @@ services:
     entrypoint: >
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
-             gunicorn file_manager.wsgi:application --bind 0.0.0.0:8000"
+             gunicorn file_manager.wsgi:application --bind 0.0.0.0:8000 --workers 4 --worker-class gevent --timeout 120"
 
   frontend:
     build:
@@ -77,6 +67,5 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:
   media_data:
   static_data:

@@ -67,15 +67,7 @@ DATABASES = {
     }
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get('REDIS_URL', 'redis://redis:6379/1'),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
-    }
-}
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -134,7 +126,6 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'API for managing files',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    # UI settings
     'SWAGGER_UI_DIST': 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@latest',
     'SWAGGER_UI_SETTINGS': {
         'deepLinking': True,
@@ -154,8 +145,9 @@ SPECTACULAR_SETTINGS = {
     'SECURITY': [{'cookieAuth': []}],  # apply to all views by default  
 }
 
-# CORS settings for React frontend
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173", 
@@ -164,6 +156,8 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost",
+    "http://127.0.0.1",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -187,16 +181,15 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 
-# Production security settings (activate in production)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # SECURE_SSL_REDIRECT = True #  handled by the proxy header
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
-# Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

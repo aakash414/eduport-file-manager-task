@@ -29,40 +29,33 @@ class FileUpload(models.Model):
         help_text="Original filename as uploaded by user"
     )
     
-    # File hash for duplicate detection (SHA256 for security)
     file_hash = models.CharField(
-        max_length=64,  # SHA256 produces 64 character hex string
-        unique=True,    # Prevents duplicate files across entire system
-        db_index=True,  # Index for fast duplicate checking
+        max_length=64,
+        unique=True,
+        db_index=True,
         help_text="SHA256 hash of file content for duplicate detection"
     )
     
-    # File size in bytes
     file_size = models.BigIntegerField(
         help_text="File size in bytes"
     )
     
-    # Upload timestamp
     upload_date = models.DateTimeField(
         auto_now_add=True,
-        db_index=True  # Index for sorting by upload date
+        db_index=True
     )
-    
-    # File type derived from extension
     file_type = models.CharField(
         max_length=10,
-        db_index=True,  # Index for filtering by file type
+        db_index=True,
         help_text="File extension/type"
     )
     
-    # Optional: File description
     description = models.TextField(
         blank=True,
         null=True,
-                help_text="Optional file description"
+        help_text="Optional file description"
     )
 
-    # Mime type of the file
     mime_type = models.CharField(
         max_length=100,
         blank=True,
@@ -97,15 +90,11 @@ class FileUpload(models.Model):
     )
     
     class Meta:
-        ordering = ['-upload_date']  # Most recent first
+        ordering = ['-upload_date']
         indexes = [
-            # Composite index for user + upload date (common query pattern)
             models.Index(fields=['uploaded_by', '-upload_date']),
-            # Index for searching by filename
             models.Index(fields=['original_filename']),
-            # Index for file type filtering
             models.Index(fields=['file_type']),
-            # Index for sorting by file size
             models.Index(fields=['file_size']),
         ]
         verbose_name = "File Upload"

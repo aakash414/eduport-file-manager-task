@@ -18,7 +18,7 @@ function getCookie(name: string): string | null {
 }
 
 const apiClient = axios.create({
-    baseURL: 'http://localhost:8000/api',
+    baseURL: '/api',
     withCredentials: true, // Important for sending cookies
 });
 
