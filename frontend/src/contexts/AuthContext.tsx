@@ -6,13 +6,13 @@ interface User {
     email: string;
 }
 
-interface AuthContextType {
+export type AuthContextType = {
     user: User | null;
     login: (userData: User) => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
     isAuthenticated: boolean;
     isLoading: boolean;
-}
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -36,19 +36,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         checkUserLoggedIn();
     }, [checkUserLoggedIn]);
 
-    const login = (userData: User) => {
-        return new Promise<void>((resolve) => {
-            setUser(userData);
-            resolve();
-        });
+    const login = async (userData: User): Promise<void> => {
+        setIsLoading(true);
+        setUser(userData);
+
+        try {
+            const { data } = await apiClient.get('/users/user/');
+            setUser(data);
+        } catch (error) {
+            console.error('Failed to verify user after login', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const logout = async () => {
+        setIsLoading(true);
         try {
             await apiClient.post('/users/logout/');
             setUser(null);
         } catch (error) {
             console.error('Logout failed', error);
+            setUser(null);
+        } finally {
+            setIsLoading(false);
         }
     };
 

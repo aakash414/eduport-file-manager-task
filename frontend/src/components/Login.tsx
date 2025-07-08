@@ -19,7 +19,7 @@ const Login: React.FC = () => {
                 username,
                 password,
             });
-            login(response.data);
+            await login(response.data);
             navigate('/dashboard');
         } catch (err) {
             const error = err as AxiosError<{ error: string }>;

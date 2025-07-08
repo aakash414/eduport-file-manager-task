@@ -8,7 +8,19 @@ import './App.css';
 import NotFound from './pages/NotFound';
 import Redirect from './pages/Redirect';
 
+import { useAuth } from './contexts/AuthContext';
+
 function App() {
+    const { isLoading } = useAuth();
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-xl">Loading...</div>
+            </div>
+        );
+    }
+
     return (
         <Routes>
             <Route path='/' element={<Redirect />} />
