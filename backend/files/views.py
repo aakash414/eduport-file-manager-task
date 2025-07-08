@@ -262,37 +262,30 @@ class FileContentPreviewView(APIView):
 
     def get(self, request, pk):
         try:
-            # 1. Fetch the file object, ensuring ownership
             file_obj = get_object_or_404(
                 FileUpload,
                 id=pk,
                 uploaded_by=request.user
             )
 
-            # 2. Check if file exists on disk
             file_path = file_obj.file.path
             if not os.path.exists(file_path):
                 logger.error(f"File not found on disk for pk={pk}: {file_path}")
                 return Response({'error': 'File not found on disk'}, status=status.HTTP_404_NOT_FOUND)
-
-            # 3. Check if file size is within preview limits
             if file_obj.file_size > self.MAX_PREVIEW_SIZE:
                 logger.warning(f"File too large for preview for pk={pk}, size={file_obj.file_size}")
                 return Response({'error': 'File is too large for preview'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
 
-            # 4. Determine if the file type is previewable (more robustly)
             file_ext = file_obj.original_filename.split('.')[-1].lower() if '.' in file_obj.original_filename else ''
             mime_type = file_obj.mime_type.lower() if file_obj.mime_type else ''
 
             is_previewable = False
-            # First, try to use the MIME type if it exists and is recognized
             if mime_type:
                 if any(mime_type.startswith(prefix) for prefix in self.PREVIEWABLE_MIME_PREFIXES):
                     is_previewable = True
                 elif mime_type in self.PREVIEWABLE_MIME_TYPES:
                     is_previewable = True
             
-            # If MIME type check fails or mime_type is empty, fall back to extension
             if not is_previewable:
                 if file_ext in self.PREVIEWABLE_IMAGE_EXTENSIONS:
                     is_previewable = True
@@ -309,17 +302,13 @@ class FileContentPreviewView(APIView):
                 logger.warning(f"Unsupported preview file type for pk={pk}, mime='{mime_type}', ext='{file_ext}'")
                 return Response({'error': 'This file type is not supported for preview'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
 
-            # 5. Read content and serve the file
             if mime_type == 'text/plain':
-                # For text files, return a truncated part
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read(self.MAX_TEXT_PREVIEW_CHARS)
             else:
-                # For binary files (image, pdf, etc.), return the whole file
                 with open(file_path, 'rb') as f:
                     content = f.read()
 
-            # 6. Create and return the HttpResponse
             response = HttpResponse(content, content_type=mime_type)
             response['Content-Disposition'] = f'inline; filename=\"{file_obj.original_filename}\"' 
             return response
@@ -333,7 +322,7 @@ class FileContentPreviewView(APIView):
 
 
 @api_view(['GET'])
-@permission_classes([permissions.AllowAny]) # Should be accessible without auth
+@permission_classes([permissions.AllowAny]) 
 def health_check(request):
     return Response({'status': 'ok', 'message': 'Service is healthy.'}, status=status.HTTP_200_OK)
     
@@ -428,7 +417,6 @@ def bulk_delete_files(request):
     
     try:
         with transaction.atomic():
-            # Get files to delete
             files_to_delete = FileUpload.objects.filter(
                 id__in=file_ids,
                 uploaded_by=request.user
@@ -437,10 +425,8 @@ def bulk_delete_files(request):
             deleted_count = files_to_delete.count()
             filenames = list(files_to_delete.values_list('original_filename', flat=True))
             
-            # Delete files
             files_to_delete.delete()
             
-            # Log bulk deletion
             logger.info(
                 f"Bulk deletion: {deleted_count} files deleted "
                 f"by user {request.user.username}"
@@ -464,7 +450,6 @@ def shared_file_download(request, token):
     try:
         share_link = get_object_or_404(FileShareLink, token=token)
         
-        # Check if link is expired
         if share_link.is_expired():
             logger.warning(f"Expired share link download attempted: {token}")
             return Response(
@@ -472,7 +457,6 @@ def shared_file_download(request, token):
                 status=status.HTTP_410_GONE
             )
         
-        # Check if link is still active
         if not share_link.is_active:
             logger.warning(f"Inactive share link download attempted: {token}")
             return Response(
@@ -480,17 +464,14 @@ def shared_file_download(request, token):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Update access count
         share_link.increment_access_count()
         
-        # Log download
         file_upload = share_link.file_upload
         logger.info(
             f"Shared file downloaded: {file_upload.original_filename} "
             f"via token {token} from IP {request.META.get('REMOTE_ADDR')}"
         )
         
-        # Serve file
         response = HttpResponse(
             file_upload.file.read(),
             content_type='application/octet-stream'
@@ -506,134 +487,6 @@ def shared_file_download(request, token):
     except Exception as e:
         logger.error(f"Shared file download failed: {str(e)}")
         raise Http404("File not found or access denied.")
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def duplicate_files_cleanup(request):
-    try:
-        # Find duplicate files for the user
-        user_files = FileUpload.objects.filter(uploaded_by=request.user)
-        
-        # Group files by hash to find duplicates
-        duplicate_groups = {}
-        for file_upload in user_files:
-            if file_upload.file_hash in duplicate_groups:
-                duplicate_groups[file_upload.file_hash].append(file_upload)
-            else:
-                duplicate_groups[file_upload.file_hash] = [file_upload]
-        
-        # Filter to only groups with duplicates
-        actual_duplicates = {
-            hash_val: files for hash_val, files in duplicate_groups.items()
-            if len(files) > 1
-        }
-        
-        if not actual_duplicates:
-            return Response({
-                'message': 'No duplicate files found.',
-                'duplicates': []
-            })
-        
-        duplicate_info = []
-        for hash_val, files in actual_duplicates.items():
-            files.sort(key=lambda x: x.upload_date)
-            original = files[0]
-            duplicates = files[1:]
-            
-            duplicate_info.append({
-                'file_hash': hash_val,
-                'original_file': {
-                    'id': original.id,
-                    'filename': original.original_filename,
-                    'upload_date': original.upload_date,
-                },
-                'duplicate_files': [
-                    {
-                        'id': dup.id,
-                        'filename': dup.original_filename,
-                        'upload_date': dup.upload_date,
-                    } for dup in duplicates
-                ],
-                'potential_savings': sum(dup.file_size for dup in duplicates)
-            })
-        
-        if request.data.get('cleanup', False):
-            total_deleted = 0
-            total_saved_space = 0
-            
-            with transaction.atomic():
-                for hash_val, files in actual_duplicates.items():
-                    files.sort(key=lambda x: x.upload_date)
-                    duplicates_to_delete = files[1:]  # Keep oldest
-                    
-                    for dup in duplicates_to_delete:
-                        total_saved_space += dup.file_size
-                        dup.delete()
-                        total_deleted += 1
-            
-            logger.info(
-                f"Duplicate cleanup: {total_deleted} files deleted, "
-                f"{total_saved_space} bytes saved by user {request.user.username}"
-            )
-            
-            return Response({
-                'message': f'Cleanup completed. {total_deleted} duplicate files deleted.',
-                'files_deleted': total_deleted,
-                'space_saved': total_saved_space,
-                'space_saved_display': FileListView()._format_file_size(total_saved_space)
-            })
-        
-        return Response({
-            'message': f'Found {len(actual_duplicates)} sets of duplicate files.',
-            'duplicates': duplicate_info,
-            'total_potential_savings': sum(
-                info['potential_savings'] for info in duplicate_info
-            )
-        })
-        
-    except Exception as e:
-        logger.error(f"Duplicate cleanup failed: {str(e)}")
-        return Response(
-            {'error': 'Failed to process duplicate files.'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def file_quick_metadata(request, file_id):
-    try:
-        file_obj = get_object_or_404(
-            FileUpload,
-            id=file_id,
-            user=request.user
-        )
-        
-        # Basic metadata without updating view count
-        metadata = {
-            'id': file_obj.id,
-            'filename': file_obj.filename,
-            'original_filename': file_obj.original_filename,
-            'file_size': file_obj.file_size,
-            'file_type': file_obj.file_type,
-            'mime_type': file_obj.mime_type,
-            'upload_date': file_obj.upload_date,
-            'last_modified': file_obj.last_modified,
-            'view_count': file_obj.view_count,
-            'is_duplicate': file_obj.is_duplicate,
-            'file_extension': file_obj.filename.split('.')[-1].lower() if '.' in file_obj.filename else '',
-            'size_formatted': format_file_size(file_obj.file_size),
-        }
-        
-        return Response(metadata, status=status.HTTP_200_OK)
-        
-    except FileUpload.DoesNotExist:
-        return Response(
-            {'error': 'File not found'},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
 
 def format_file_size(size_bytes):
     if size_bytes == 0:

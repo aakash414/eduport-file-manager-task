@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AxiosError } from 'axios';
 import apiClient from '../api/axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RegisterError {
     username?: string[];
@@ -16,19 +17,26 @@ const Register: React.FC = () => {
     const [password, setPassword] = useState('');
     const [errors, setErrors] = useState<RegisterError>({});
     const navigate = useNavigate();
+    const { login, isAuthenticated } = useAuth();
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrors({});
         try {
-            await apiClient.post('/users/register/', {
+            const response = await apiClient.post('/users/register/', {
                 username,
                 email,
                 password,
             }, {
                 withCredentials: true
             });
-            navigate('/login');
+            login(response.data);
         } catch (err) {
             const error = err as AxiosError<RegisterError>;
             if (error.response && error.response.data) {

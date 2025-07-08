@@ -4,8 +4,10 @@ import * as fileService from '../services/fileService';
 import type { FileUpload, PaginatedResponse, SearchParams, ProgressEvent } from '../utils/types';
 
 import { useToast } from './useToast';
+import { useAuth } from '../contexts/AuthContext';
 
 export const useFiles = () => {
+    const { isAuthenticated } = useAuth();
     const [fileData, setFileData] = useState<PaginatedResponse<FileUpload> | null>(null);
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -15,8 +17,8 @@ export const useFiles = () => {
     const [currentSearchParams, setCurrentSearchParams] = useState<SearchParams>({});
 
     const searchFiles = useCallback(async (params: SearchParams) => {
+        if (!isAuthenticated) return;
         setLoading(true);
-        // A new search resets pagination and stores the new filter state.
         setCurrentSearchParams(params);
 
         try {
@@ -39,8 +41,8 @@ export const useFiles = () => {
         }
     }, [searchFiles, currentSearchParams]);
 
-    // Handle pagination using cursor URLs
     const fetchPage = useCallback(async (url: string | null) => {
+        if (!isAuthenticated) return;
         if (!url) {
             return;
         }
@@ -134,10 +136,11 @@ export const useFiles = () => {
         }
     };
 
-    // Initial fetch on component mount.
     useEffect(() => {
-        searchFiles({});
-    }, [searchFiles]);
+        if (isAuthenticated) {
+            searchFiles({});
+        }
+    }, [searchFiles, isAuthenticated]);
 
     return {
         fileData,

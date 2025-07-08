@@ -8,7 +8,7 @@ from django.utils.decorators import method_decorator
 from .serializers import UserSerializer
 
 class RegisterView(views.APIView):
-    permission_classes = [AllowAny] # Anyone can register
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = UserSerializer(data=request.data)
@@ -24,7 +24,7 @@ class RegisterView(views.APIView):
         )
 
 class LoginView(views.APIView):
-    permission_classes = [AllowAny] # Anyone can attempt to log in
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         username = request.data.get('username')
@@ -54,8 +54,7 @@ class LoginView(views.APIView):
         )
 
 class LogoutView(views.APIView):
-    permission_classes = [IsAuthenticated] # Only authenticated users can log out
-
+    permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwargs):
         logout(request)
         return Response(
@@ -64,7 +63,7 @@ class LogoutView(views.APIView):
         )
 
 class UserView(views.APIView):
-    permission_classes = [IsAuthenticated] # Only authenticated users can view their data
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request, *args, **kwargs):
         return Response(UserSerializer(request.user).data)

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiLogOut, FiUser } from 'react-icons/fi';
+import { FiLogOut } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -32,23 +32,16 @@ const Header: React.FC = () => {
         navigate('/login');
     };
 
-    const handleProfile = () => {
-        setDropdownOpen(false);
-        navigate('/profile');
-    };
-
     if (!user) {
-        return null; // Or a loading spinner, or a login button
+        return null;
     }
     return (
         <header className="sticky top-0 z-30 w-full px-8 py-4 bg-white/80 backdrop-blur-sm shadow-sm">
             <div className="flex items-center justify-between">
-                {/* Logo */}
                 <div className="flex items-center space-x-2">
                     <h1 className="text-xl font-bold text-gray-800">File Manager</h1>
                 </div>
 
-                {/* User Profile Dropdown */}
                 <div className="relative">
                     <div
                         className="flex items-center space-x-3 cursor-pointer"
@@ -69,13 +62,6 @@ const Header: React.FC = () => {
                                 <p className="text-xs text-gray-500">{user.email}</p>
                             </div>
                             <div className="py-1">
-                                <button
-                                    onClick={handleProfile}
-                                    className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                >
-                                    <FiUser className="w-4 h-4 mr-2" />
-                                    Profile
-                                </button>
                                 <button
                                     onClick={handleSignOut}
                                     className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
