@@ -8,7 +8,7 @@ interface User {
 
 interface AuthContextType {
     user: User | null;
-    login: (userData: User) => void;
+    login: (userData: User) => Promise<void>;
     logout: () => void;
     isAuthenticated: boolean;
     isLoading: boolean;
@@ -24,7 +24,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsLoading(true);
         try {
             const { data } = await apiClient.get('/users/user/');
-            console.log(data, "data");
             setUser(data);
         } catch (error) {
             setUser(null);
@@ -38,7 +37,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, [checkUserLoggedIn]);
 
     const login = (userData: User) => {
-        setUser(userData);
+        return new Promise<void>((resolve) => {
+            setUser(userData);
+            resolve();
+        });
     };
 
     const logout = async () => {

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AxiosError } from 'axios';
 import apiClient from '../api/axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RegisterError {
     username?: string[];
@@ -15,20 +16,27 @@ const Register: React.FC = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [errors, setErrors] = useState<RegisterError>({});
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { login, isAuthenticated } = useAuth();
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrors({});
+        setLoading(true);
         try {
-            await apiClient.post('/users/register/', {
+            const response = await apiClient.post('/users/register/', {
                 username,
                 email,
                 password,
-            }, {
-                withCredentials: true
             });
-            navigate('/login');
+            login(response.data);
         } catch (err) {
             const error = err as AxiosError<RegisterError>;
             if (error.response && error.response.data) {
@@ -37,6 +45,8 @@ const Register: React.FC = () => {
                 setErrors({ non_field_errors: ['Registration failed. Please try again.'] });
             }
             console.error('Registration failed', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -71,7 +81,9 @@ const Register: React.FC = () => {
                 className='border border-gray-300 rounded-md p-2 bg-gray-150'
             />
             {errors.password && <p className="text-red-500">{errors.password.join(', ')}</p>}
-            <button type="submit">Register</button>
+            <button type="submit" disabled={loading}>
+                {loading ? 'Registering...' : 'Register'}
+            </button>
         </form>
     );
 };

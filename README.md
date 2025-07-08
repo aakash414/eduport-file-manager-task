@@ -1,83 +1,94 @@
-# File Management System
+# File Manager - Web App
 
-This project is a comprehensive file management system built to fulfill the requirements of the provided technical assessment. It features a Django backend and a React frontend, containerized with Docker for setup and deployment.
+A simple file management system built with Django and React. Users can upload files, manage them, and share them with others.
 
-## Core Features & Implementation Choices
+## What It Does
 
-This section details the implementation of each required feature, explaining the technical decisions made.
+- **Upload files** with drag & drop
+- **Duplicate detection** - automatically detects if you're uploading the same file twice
+- **File search** - find files by name, type, or date
+- **User management** - each user has their own files
 
-### 1. User Authentication
+## Tech Stack
 
--   **Technology:** Implemented using Django's built-in session authentication.
+- **Backend:** Django + Django REST Framework
+- **Frontend:** React with TypeScript
+- **Database:** PostgreSQL
+- **File processing:** Celery + Redis for handling large uploads
+- **Deployment:** Docker Compose
 
-### 2. File Upload & Duplicate Prevention
+## How It Works
 
--   **Technology:** File uploads are handled through a REST API endpoint. Duplicate prevention is done using a SHA-256 hash of the file's content upon upload.
--   **Implementation:**
-    -   The `FileUpload` model has a `file_hash` field with a `unique=True` constraint at the database level. This guarantees that no two records can have the same file hash, ensuring data integrity.
-    -   Before saving a new file, its SHA-256 hash is computed in chunks to handle large files efficiently without consuming excessive memory.
-    -   If a file with the same hash already exists, the database will raise an `IntegrityError`. The `FileUploadView` catches this specific error and returns a `409 Conflict` response to the client, indicating that the file is a duplicate.
--   **Reasoning:** This hash-based approach is highly effective for preventing duplicate file uploads. Using a database-level `unique` constraint is the most reliable way to enforce this rule.
+### File Upload
+When you upload a file, the system creates a SHA-256 hash of the file content. This prevents duplicate uploads even if files have different names. The hash calculation is done in chunks to handle large files without eating up memory.
 
-### 3. File Management
+### Search & Performance
+File listing uses cursor pagination instead of regular pagination. Database indexes on common search fields (filename, upload date, file type) make searches fast.
 
--   **List & Search:**
-    -   **Technology:** The file list is exposed via a paginated API endpoint. The search functionality allows filtering by filename, file type, and upload date.
-    -   **Optimization:**
-        -   **Database Indexing:** I've added database indexes to the `FileUpload` model on fields that are frequently used in queries, such as `uploaded_by`, `upload_date`, `file_type`, and `file_hash`. This significantly improves the performance of filtering and sorting operations.
-        -   **Pagination:** I chose `CursorPagination` for the file list endpoint. It's more efficient for large datasets than traditional page number pagination, as it avoids expensive `COUNT` queries.
-        -   **Caching:** I've implemented a caching layer using Redis. The file list and file type endpoints are cached to reduce database load and provide a faster response to the user. The cache is intelligently invalidated whenever a file is uploaded, updated, or deleted.
+### Bulk Uploads
+For multiple file uploads, I use Celery to process them in the background. This keeps the UI responsive while files are being processed.
 
--   **Delete:**
-    -   **Implementation:** Users can delete their own files via a `DELETE` request to the file's API endpoint. The backend ensures that users can only delete files they have uploaded.
+## Quick Start
 
-### 4. API Documentation
+1. **Clone the project:**
+   ```bash
+   git clone https://github.com/aakash414/eduport-file-manager-task
+   cd eduport-file-manager-task
+   ```
 
--   **Technology:** I've used `drf-spectacular` to generate OpenAPI 3 documentation for the backend API.
--   **Reasoning:** Providing clear API documentation is crucial for any project. `drf-spectacular` automatically generates a comprehensive and interactive Swagger UI, which makes it easy to explore and test the API endpoints. The documentation is available at the `/api/docs/` endpoint.
+2. **Start with Docker:**
+   ```bash
+   docker-compose up --build
+   ```
 
-## Bonus: Deployment with Docker
+3. **Access the app:**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000/
+   - API docs: http://localhost:8000/docs/
 
--   **Technology:** The entire application (backend, frontend, database, and Redis) is containerized using Docker and orchestrated with Docker Compose.
--   **Reasoning:**
-    -   **Consistency:** Docker ensures that the application runs in a consistent environment, eliminating the "it works on my machine" problem.
-    -   **Ease of Use:** With a single `docker-compose up` command, the entire stack is provisioned and started. This simplifies the setup process for both development and production.
-    -   **Scalability:** The containerized setup makes it easy to scale individual components of the application in the future.
+## Project Structure
 
-## Getting Started
-
-### Prerequisites
-
--   [Docker](https://www.docker.com/get-started)
--   [Docker Compose](https://docs.docker.com/compose/install/)
-
-### Running the Application
-
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/your-username/eduport-file-manager.git
-    cd eduport-file-manager
-    ```
-
-2.  **Create an environment file:**
-    ```bash
-    cp .env.example .env
-    ```
-    Update the `.env` file with a new `SECRET_KEY`.
-
-3.  **Build and run with Docker Compose:**
-    ```bash
-    docker-compose up --build
-    ```
-
-The application will be available at:
-
--   **Frontend:** [http://localhost:3000](http://localhost:3000)
--   **Backend API:** [http://localhost:8000/api/](http://localhost:8000/api/)
--   **API Docs:** [http://localhost:8000/api/docs/](http://localhost:8000/api/docs/)
-
-### Stopping the Application
-
-```bash
-docker-compose down
 ```
+backend/
+├── file_manager/          # Django project settings
+├── files/                 # File management app
+├── users/                 # User management
+└── requirements.txt
+
+frontend/
+├── src/
+│   ├── components/        # React components
+│   ├── pages/             # Page components
+│   ├── services/          # API calls
+│   └── utils/             # Helper functions
+├── public/
+└── package.json
+```
+
+## Features
+
+1. **Smart duplicate detection** - Uses file content, not just filename
+2. **Fast search** - 
+4. **Background processing** - Large uploads don't freeze the UI
+5. **Clean API** - Easy to integrate with other tools
+
+## What I Learned
+
+- Cursor pagination is much faster than offset pagination for large datasets
+- File hashing in chunks prevents memory issues with large files
+- Celery is great for background tasks but increased a bit load on server
+- Got to learn more about nginx,docker and docker compose
+- First time setting up docker and aws on my one
+
+## Known Issues
+
+- File upload for mp3 not not working.
+- Search could be more advanced (no regex support)
+- Redis not properly utilized yet(only for task queue for celery currently)
+
+## Future Improvements
+
+- Bulk delete: This one was very close but due to time constraints I was not able to complete it.
+- Better file preview for more file types
+- Folder support
+- File sharing via email/ link

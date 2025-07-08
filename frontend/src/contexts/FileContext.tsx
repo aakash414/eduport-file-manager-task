@@ -13,6 +13,7 @@ interface FileContextType {
     searchFiles: (params: SearchParams) => Promise<void>;
     fetchPage: (url: string | null) => Promise<void>;
     refreshCurrentView: () => void;
+    clearFileData: () => void;
 }
 
 const FileContext = createContext<FileContextType | undefined>(undefined);
@@ -28,7 +29,8 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
         bulkUploadFiles,
         deleteFile,
         searchFiles,
-        refreshCurrentView
+        refreshCurrentView,
+        clearFileData
     } = useFiles();
 
     return (
@@ -42,7 +44,8 @@ export const FileProvider = ({ children }: { children: ReactNode }) => {
             bulkUploadFiles,
             deleteFile,
             searchFiles,
-            refreshCurrentView
+            refreshCurrentView,
+            clearFileData
         }}>
             {children}
         </FileContext.Provider>

@@ -7,9 +7,9 @@ const Header: React.FC = () => {
     const [isDropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
-    const { user, logout } = useAuth();
-    const getInitials = (name: string) => {
+    const { user, logout, isLoading } = useAuth();
 
+    const getInitials = (name: string) => {
         return name ? name.charAt(0).toUpperCase() : '';
     };
 
@@ -26,30 +26,47 @@ const Header: React.FC = () => {
         };
     }, [dropdownRef]);
 
-    const handleSignOut = () => {
-        logout();
+    const handleSignOut = async () => {
+        await logout();
         setDropdownOpen(false);
         navigate('/login');
     };
+
+    if (isLoading) {
+        return (
+            <header className="sticky top-0 z-30 w-full px-8 py-4 bg-white/80 backdrop-blur-sm shadow-sm">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <h1 className="text-xl font-bold text-gray-800">File Manager</h1>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-300 animate-pulse"></div>
+                    </div>
+                </div>
+            </header>
+        );
+    }
+
     if (!user) {
         return null;
     }
+
     return (
         <header className="sticky top-0 z-30 w-full px-8 py-4 bg-white/80 backdrop-blur-sm shadow-sm">
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                     <h1 className="text-xl font-bold text-gray-800">File Manager</h1>
                 </div>
-
                 <div className="relative">
                     <div
                         className="flex items-center space-x-3 cursor-pointer"
                         onClick={() => setDropdownOpen(!isDropdownOpen)}
                     >
                         <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-                            <span className="text-white font-bold">{getInitials(user.username)}</span>
+                            <span className="text-white font-bold">
+                                {user?.username ? getInitials(user.username) : '?'}
+                            </span>
                         </div>
-
                     </div>
                     {isDropdownOpen && (
                         <div
@@ -57,8 +74,12 @@ const Header: React.FC = () => {
                             className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200"
                         >
                             <div className="p-3 border-b border-gray-200">
-                                <p className="font-semibold text-sm text-gray-800">{user.username}</p>
-                                <p className="text-xs text-gray-500">{user.email}</p>
+                                <p className="font-semibold text-sm text-gray-800">
+                                    {user?.username || 'Loading...'}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    {user?.email || 'Loading...'}
+                                </p>
                             </div>
                             <div className="py-1">
                                 <button

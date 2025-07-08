@@ -144,11 +144,11 @@ SPECTACULAR_SETTINGS = {
             'cookieAuth': {
                 'type': 'apiKey',
                 'in': 'cookie',
-                'name': 'sessionid',  # default Django cookie
+                'name': 'sessionid',  
             }
         }
     },
-    'SECURITY': [{'cookieAuth': []}],  # apply to all views by default  
+    'SECURITY': [{'cookieAuth': []}],  
 }
 
 CORS_ALLOWED_ORIGINS = [
@@ -174,7 +174,7 @@ CSRF_TRUSTED_ORIGINS = [
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 3600 * 24 * 7  # 1 week
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production
+SESSION_COOKIE_SECURE = not DEBUG  
 SESSION_COOKIE_SAMESITE = 'Lax'
 
 # File upload settings
@@ -189,7 +189,7 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 if not DEBUG:
-    # SECURE_SSL_REDIRECT = True #  handled by the proxy header
+    # SECURE_SSL_REDIRECT = True #  handled by the proxy header athayath nginx
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
@@ -225,7 +225,6 @@ LOGGING = {
     },
 }
 
-# Custom settings for file management
 FILEMANAGER_SETTINGS = {
     'MAX_FILE_SIZE': 100 * 1024 * 1024,  # 100MB
     'ALLOWED_EXTENSIONS': [

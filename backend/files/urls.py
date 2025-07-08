@@ -1,4 +1,3 @@
-# files/urls.py
 from django.urls import path
 from . import views
 
@@ -7,7 +6,7 @@ app_name = 'files'
 
 urlpatterns = [
     path('health/', views.health_check, name='health-check'),
-    # Core file operations
+    # Core
     path('upload/', views.FileUploadView.as_view(), name='file-upload'),
     path('', views.FileListView.as_view(), name='file-list'),
     path('types/', views.FileTypesView.as_view(), name='file-types'),

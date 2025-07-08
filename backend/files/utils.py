@@ -19,10 +19,6 @@ def validate_file_size(value):
 
 
 def validate_file_type(value):
-    """
-    Validate file type based on extension.
-    Add/remove extensions based on your security requirements.
-    """
     allowed_extensions = [
         'pdf', 'doc', 'docx', 'txt', 'jpg', 'jpeg', 'png', 'gif', 
         'mp4', 'avi', 'mov', 'zip', 'rar', 'csv', 'xlsx', 'xls'

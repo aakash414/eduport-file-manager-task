@@ -62,17 +62,15 @@ class FileUpload(models.Model):
         help_text="MIME type of the file"
     )
 
-    # last modified timestamp
     last_modified = models.DateTimeField(
         auto_now=True,
         help_text="Last time file was modified"
     )
     
-    # Track file access for analytics (optional)
     last_accessed = models.DateTimeField(
         null=True,
         blank=True,
-                help_text="Last time file was accessed"
+        help_text="Last time file was accessed"
     )
 
     view_count = models.PositiveIntegerField(

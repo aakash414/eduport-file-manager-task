@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../services/api';
 import * as fileService from '../services/fileService';
 import type { FileUpload, PaginatedResponse, SearchParams, ProgressEvent } from '../utils/types';
@@ -8,6 +8,9 @@ import { useAuth } from '../contexts/AuthContext';
 
 export const useFiles = () => {
     const { isAuthenticated } = useAuth();
+    const isAuthenticatedRef = useRef(isAuthenticated);
+    isAuthenticatedRef.current = isAuthenticated;
+
     const [fileData, setFileData] = useState<PaginatedResponse<FileUpload> | null>(null);
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -16,8 +19,12 @@ export const useFiles = () => {
 
     const [currentSearchParams, setCurrentSearchParams] = useState<SearchParams>({});
 
+    const clearFileData = useCallback(() => {
+        setFileData(null);
+    }, []);
+
     const searchFiles = useCallback(async (params: SearchParams) => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticatedRef.current) return;
         setLoading(true);
         setCurrentSearchParams(params);
 
@@ -32,17 +39,8 @@ export const useFiles = () => {
         }
     }, [addToast]);
 
-    const refreshCurrentView = useCallback(() => {
-        const params = currentSearchParams;
-        if (Object.keys(params).length > 0) {
-            searchFiles(params);
-        } else {
-            fetchPage(null);
-        }
-    }, [searchFiles, currentSearchParams]);
-
     const fetchPage = useCallback(async (url: string | null) => {
-        if (!isAuthenticated) return;
+        if (!isAuthenticatedRef.current) return;
         if (!url) {
             return;
         }
@@ -61,26 +59,32 @@ export const useFiles = () => {
         }
     }, [addToast]);
 
+    const refreshCurrentView = useCallback(() => {
+        searchFiles(currentSearchParams);
+    }, [searchFiles, currentSearchParams]);
+
     const uploadFile = useCallback(async (file: File) => {
+        if (!isAuthenticatedRef.current) return;
         setLoading(true);
         setProgress(0);
 
         try {
-            const response = await fileService.uploadFile(file, (progressEvent: ProgressEvent) => {
+            await fileService.uploadFile(file, (progressEvent: ProgressEvent) => {
                 const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
                 setProgress(percentCompleted);
             });
-            setFileData(prev => prev ? { ...prev, results: [response, ...prev.results] } : { results: [response], count: 1, next: null, previous: null });
             addToast('File uploaded successfully!', 'success');
+            refreshCurrentView();
         } catch (err) {
             console.error('Failed to upload file:', err);
             addToast('Failed to upload file.', 'error');
         } finally {
             setLoading(false);
         }
-    }, [addToast]);
+    }, [addToast, refreshCurrentView]);
 
     const bulkUploadFiles = async (files: File[]) => {
+        if (!isAuthenticatedRef.current) return;
         setLoading(true);
         setProgress(0);
         setUploadReport(null);
@@ -98,7 +102,7 @@ export const useFiles = () => {
 
             setTimeout(() => {
                 refreshCurrentView();
-            }, 5000);
+            }, 1000);
         } catch (err) {
             addToast('Bulk upload failed.', 'error');
             console.error(err);
@@ -109,16 +113,11 @@ export const useFiles = () => {
     };
 
     const deleteFile = async (fileId: number) => {
+        if (!isAuthenticatedRef.current) return;
         try {
             await fileService.deleteFile(fileId);
             addToast('File deleted successfully.', 'success');
-            setFileData(prev => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    results: prev.results.filter(file => file.id !== fileId)
-                };
-            });
+            refreshCurrentView();
         } catch (err) {
             addToast('Failed to delete file.', 'error');
             console.error(err);
@@ -128,8 +127,10 @@ export const useFiles = () => {
     useEffect(() => {
         if (isAuthenticated) {
             searchFiles({});
+        } else {
+            clearFileData();
         }
-    }, [searchFiles, isAuthenticated]);
+    }, [isAuthenticated, searchFiles, clearFileData]);
 
     return {
         fileData,
@@ -141,6 +142,7 @@ export const useFiles = () => {
         uploadFile,
         bulkUploadFiles,
         deleteFile,
-        refreshCurrentView
+        refreshCurrentView,
+        clearFileData
     };
 };

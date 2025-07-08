@@ -5,12 +5,15 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
 import App from './App.tsx';
 import { AuthProvider } from './contexts/AuthContext';
+import { FileProvider } from './contexts/FileContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <FileProvider>
+          <App />
+        </FileProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
