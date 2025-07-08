@@ -31,7 +31,6 @@ const Header: React.FC = () => {
         setDropdownOpen(false);
         navigate('/login');
     };
-
     if (!user) {
         return null;
     }

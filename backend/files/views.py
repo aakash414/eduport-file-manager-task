@@ -32,7 +32,7 @@ from .serializers import (
     BulkFileUploadSerializer,
     FileUploadSerializer, FileListSerializer, FileDetailSerializer,
     FileSearchSerializer,
-    BulkDeleteSerializer
+
 )
 
 
@@ -54,14 +54,11 @@ class BulkFileUploadView(APIView):
 
         files_data = []
         for uploaded_file in files:
-            # Read file content to pass to Celery task
-            # This ensures the data is JSON-serializable
             files_data.append({
                 'name': uploaded_file.name,
                 'content': uploaded_file.read(),
             })
 
-        # Delegate the processing to the Celery task
         process_bulk_upload.delay(request.user.id, files_data)
 
         return Response({
@@ -295,7 +292,6 @@ class FileContentPreviewView(APIView):
                     if not mime_type: mime_type = 'application/pdf'
                 elif file_ext in self.PREVIEWABLE_TEXT_EXTENSIONS:
                     is_previewable = True
-                    # Always force text/plain for security, regardless of original mime type
                     mime_type = 'text/plain'
 
             if not is_previewable:
@@ -325,124 +321,6 @@ class FileContentPreviewView(APIView):
 @permission_classes([permissions.AllowAny]) 
 def health_check(request):
     return Response({'status': 'ok', 'message': 'Service is healthy.'}, status=status.HTTP_200_OK)
-    
-    # Also define by MIME type for when it's available
-    PREVIEWABLE_MIME_PREFIXES = ['image/', 'video/', 'audio/']
-    PREVIEWABLE_MIME_TYPES = ['application/pdf', 'text/plain']
-
-    MAX_PREVIEW_SIZE = 10 * 1024 * 1024  # 10MB max for preview
-    MAX_TEXT_PREVIEW_CHARS = 50000  # 50,000 characters for text preview
-
-    def get(self, request, pk):
-        try:
-            # 1. Fetch the file object, ensuring ownership
-            file_obj = get_object_or_404(
-                FileUpload,
-                id=pk,
-                uploaded_by=request.user
-            )
-
-            # 2. Check if file exists on disk
-            file_path = file_obj.file.path
-            if not os.path.exists(file_path):
-                logger.error(f"File not found on disk for pk={pk}: {file_path}")
-                return Response({'error': 'File not found on disk'}, status=status.HTTP_404_NOT_FOUND)
-
-            # 3. Check if file size is within preview limits
-            if file_obj.file_size > self.MAX_PREVIEW_SIZE:
-                logger.warning(f"File too large for preview for pk={pk}, size={file_obj.file_size}")
-                return Response({'error': 'File is too large for preview'}, status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
-
-            # 4. Determine if the file type is previewable (more robustly)
-            file_ext = file_obj.original_filename.split('.')[-1].lower() if '.' in file_obj.original_filename else ''
-            mime_type = file_obj.mime_type.lower() if file_obj.mime_type else ''
-
-            is_previewable = False
-            # First, try to use the MIME type if it exists and is recognized
-            if mime_type:
-                if any(mime_type.startswith(prefix) for prefix in self.PREVIEWABLE_MIME_PREFIXES):
-                    is_previewable = True
-                elif mime_type in self.PREVIEWABLE_MIME_TYPES:
-                    is_previewable = True
-            
-            # If MIME type check fails or mime_type is empty, fall back to extension
-            if not is_previewable:
-                if file_ext in self.PREVIEWABLE_IMAGE_EXTENSIONS:
-                    is_previewable = True
-                    if not mime_type: mime_type = f'image/{file_ext}'
-                elif file_ext in self.PREVIEWABLE_PDF_EXTENSIONS:
-                    is_previewable = True
-                    if not mime_type: mime_type = 'application/pdf'
-                elif file_ext in self.PREVIEWABLE_TEXT_EXTENSIONS:
-                    is_previewable = True
-                    # Always force text/plain for security, regardless of original mime type
-                    mime_type = 'text/plain'
-
-            if not is_previewable:
-                logger.warning(f"Unsupported preview file type for pk={pk}, mime='{mime_type}', ext='{file_ext}'")
-                return Response({'error': 'This file type is not supported for preview'}, status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
-
-            # 5. Read content and serve the file
-            if mime_type == 'text/plain':
-                # For text files, return a truncated part
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(self.MAX_TEXT_PREVIEW_CHARS)
-            else:
-                # For binary files (image, pdf, etc.), return the whole file
-                with open(file_path, 'rb') as f:
-                    content = f.read()
-
-            # 6. Create and return the HttpResponse
-            response = HttpResponse(content, content_type=mime_type)
-            response['Content-Disposition'] = f'inline; filename=\"{file_obj.original_filename}\"' 
-            return response
-
-        except Http404:
-            return Response({'error': 'File not found or you do not have permission to view it'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            logger.error(f"Error generating file preview for pk={pk}: {str(e)}", exc_info=True)
-            return Response({'error': 'An unexpected error occurred while generating the preview.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def bulk_delete_files(request):
-    serializer = BulkDeleteSerializer(data=request.data, context={'request': request})
-    
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    file_ids = serializer.validated_data['file_ids']
-    
-    try:
-        with transaction.atomic():
-            files_to_delete = FileUpload.objects.filter(
-                id__in=file_ids,
-                uploaded_by=request.user
-            )
-            
-            deleted_count = files_to_delete.count()
-            filenames = list(files_to_delete.values_list('original_filename', flat=True))
-            
-            files_to_delete.delete()
-            
-            logger.info(
-                f"Bulk deletion: {deleted_count} files deleted "
-                f"by user {request.user.username}"
-            )
-            
-            return Response({
-                'message': f'Successfully deleted {deleted_count} files.',
-                'deleted_files': filenames
-            }, status=status.HTTP_200_OK)
-            
-    except Exception as e:
-        logger.error(f"Bulk deletion failed: {str(e)}")
-        return Response(
-            {'error': 'Bulk deletion failed. Please try again.'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
 
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
@@ -488,16 +366,16 @@ def shared_file_download(request, token):
         logger.error(f"Shared file download failed: {str(e)}")
         raise Http404("File not found or access denied.")
 
-def format_file_size(size_bytes):
-    if size_bytes == 0:
-        return "0 B"
+# def format_file_size(size_bytes):
+#     if size_bytes == 0:
+#         return "0 B"
     
-    size_names = ["B", "KB", "MB", "GB", "TB"]
-    import math
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
-    return f"{s} {size_names[i]}"
+#     size_names = ["B", "KB", "MB", "GB", "TB"]
+#     import math
+#     i = int(math.floor(math.log(size_bytes, 1024)))
+#     p = math.pow(1024, i)
+#     s = round(size_bytes / p, 2)
+#     return f"{s} {size_names[i]}"
 
 from django.http import JsonResponse
 

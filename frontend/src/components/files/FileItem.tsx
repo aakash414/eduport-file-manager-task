@@ -9,8 +9,6 @@ interface FileItemProps {
     file: FileUpload;
     onDelete: (fileId: number) => void;
     onViewFile: (fileId: number) => void;
-    onToggleSelect: (fileId: number) => void;
-    isSelected: boolean;
 }
 
 const getFileTypeBadge = (fileType: string) => {
@@ -34,7 +32,7 @@ const getFileTypeBadge = (fileType: string) => {
     return colors['default'];
 };
 
-const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile, onToggleSelect, isSelected }) => {
+const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile }) => {
     const handleDelete = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (window.confirm(`Are you sure you want to delete ${file.original_filename}?`)) {
@@ -59,14 +57,14 @@ const FileItem: React.FC<FileItemProps> = ({ file, onDelete, onViewFile, onToggl
 
     return (
         <tr className="hover:bg-gray-50 cursor-pointer" >
-            <td className="px-6 py-4 whitespace-nowrap">
+            {/* <td className="px-6 py-4 whitespace-nowrap">
                 <input
                     type="checkbox"
                     checked={isSelected}
                     onChange={() => onToggleSelect(file.id)}
                     className="mr-4"
                 />
-            </td>
+            </td> */}
             <td className="px-6 py-4 whitespace-nowrap" onClick={() => onViewFile(file.id)}>
                 <div className="font-medium text-gray-900">{file.original_filename}</div>
             </td>

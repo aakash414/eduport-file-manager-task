@@ -51,11 +51,6 @@ export const deleteFile = async (fileId: number) => {
     await api.delete(`/files/${fileId}/`);
 };
 
-export const bulkDeleteFiles = async (fileIds: number[]) => {
-    const response = await api.post('/files/bulk-delete/', { file_ids: fileIds });
-    return response.data;
-};
-
 export const downloadFile = async (fileId: number) => {
     const response = await api.get(`/files/${fileId}/download/`, {
         responseType: 'blob',

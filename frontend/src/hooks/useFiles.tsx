@@ -108,17 +108,6 @@ export const useFiles = () => {
         }
     };
 
-    const bulkDeleteFiles = async (fileIds: number[]) => {
-        try {
-            await fileService.bulkDeleteFiles(fileIds);
-            addToast('Files deleted successfully.', 'success');
-            refreshCurrentView();
-        } catch (err) {
-            addToast('Failed to delete files.', 'error');
-            console.error(err);
-        }
-    };
-
     const deleteFile = async (fileId: number) => {
         try {
             await fileService.deleteFile(fileId);
@@ -152,7 +141,6 @@ export const useFiles = () => {
         uploadFile,
         bulkUploadFiles,
         deleteFile,
-        bulkDeleteFiles,
         refreshCurrentView
     };
 };

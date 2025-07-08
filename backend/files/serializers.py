@@ -280,10 +280,7 @@ class FileSearchSerializer(serializers.Serializer):
     )
     
     def validate(self, data):
-        """
-        Custom validation to ensure logical consistency of filter parameters.
-        """
-        # Validate file size range
+       
         min_size = data.get('min_size')
         max_size = data.get('max_size')
         
@@ -316,44 +313,4 @@ class FileSearchSerializer(serializers.Serializer):
         """Validate multiple file types."""
         if value:
             return [ft.lower() for ft in value]
-        return value
-
-class BulkDeleteSerializer(serializers.Serializer):
-    
-    file_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        min_length=1,
-        max_length=100,  # Prevent abuse
-        help_text="List of file IDs to delete"
-    )
-    
-    confirm = serializers.BooleanField(
-        default=False,
-        help_text="Confirmation flag for deletion"
-    )
-    
-    def validate_confirm(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                "Bulk deletion requires explicit confirmation."
-            )
-        return value
-    
-    def validate_file_ids(self, value):
-        request = self.context.get('request')
-        if not request or not request.user:
-            raise serializers.ValidationError("Authentication required.")
-        
-        # Check if all files exist and belong to the user
-        existing_files = FileUpload.objects.filter(
-            id__in=value,
-            uploaded_by=request.user
-        ).values_list('id', flat=True)
-        
-        missing_files = set(value) - set(existing_files)
-        if missing_files:
-            raise serializers.ValidationError(
-                f"Files not found or not owned by user: {list(missing_files)}"
-            )
-        
         return value

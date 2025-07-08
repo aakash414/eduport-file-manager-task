@@ -17,10 +17,5 @@ urlpatterns = [
     
     # Bulk operations
     path('bulk-upload/', views.BulkFileUploadView.as_view(), name='bulk_file_upload'),
-    path('bulk-delete/', views.bulk_delete_files, name='bulk-delete'),
     
-    # Statistics and analytics
-    
-    
-
 ]

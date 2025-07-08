@@ -3,14 +3,13 @@ import { debounce } from 'lodash';
 import { useFileContext } from '../../contexts/FileContext';
 import FileItem from './FileItem';
 import FilePreviewModal from './FilePreviewModal';
-import { FiChevronDown, FiTrash2 } from 'react-icons/fi';
+import { FiChevronDown } from 'react-icons/fi';
 import { getFileTypes } from '../../services/fileService';
 import type { SearchParams } from '../../utils/types';
 
 export const FileList: React.FC = () => {
-    const { fileData, loading, fetchPage, deleteFile, searchFiles, bulkDeleteFiles } = useFileContext();
+    const { fileData, loading, fetchPage, deleteFile, searchFiles } = useFileContext();
     const [previewingFileIndex, setPreviewingFileIndex] = useState<number | null>(null);
-    const [selectedFiles, setSelectedFiles] = useState<number[]>([]);
 
     const [queryInput, setQueryInput] = useState('');
     const [startDateInput, setStartDateInput] = useState('');
@@ -53,22 +52,9 @@ export const FileList: React.FC = () => {
         );
     };
 
-    const handleSelectFile = (fileId: number) => {
-        setSelectedFiles(prev =>
-            prev.includes(fileId)
-                ? prev.filter(id => id !== fileId)
-                : [...prev, fileId]
-        );
-    };
 
     const handleDeleteFile = async (fileId: number) => {
         await deleteFile(fileId);
-    };
-
-    const handleBulkDelete = async () => {
-        if (selectedFiles.length === 0) return;
-        await bulkDeleteFiles(selectedFiles);
-        setSelectedFiles([]);
     };
 
     const handleNextPage = () => {
@@ -171,27 +157,13 @@ export const FileList: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Bulk Delete Button */}
-                    <div className="md:col-span-2 flex justify-end">
-                        {selectedFiles.length > 0 && (
-                            <button
-                                onClick={handleBulkDelete}
-                                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 flex items-center"
-                            >
-                                <FiTrash2 className="mr-2" />
-                                Delete ({selectedFiles.length})
-                            </button>
-                        )}
-                    </div>
+
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Select
-                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Filename
                                 </th>
@@ -221,8 +193,6 @@ export const FileList: React.FC = () => {
                                         file={file}
                                         onDelete={handleDeleteFile}
                                         onViewFile={() => handleViewFile(index)}
-                                        onToggleSelect={handleSelectFile}
-                                        isSelected={selectedFiles.includes(file.id)}
                                     />
                                 ))
                             )}
