@@ -99,97 +99,92 @@ export const FileList: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
             <div className="p-6">
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">My Files</h2>
-                <div className="flex flex-col space-y-4">
-                    <div className="flex space-x-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    placeholder="Search files..."
-                                    value={queryInput}
-                                    onChange={(e) => setQueryInput(e.target.value)}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-                                    Search
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex-1">
-                                <label htmlFor="start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                                <input
-                                    id="start-date"
-                                    type="date"
-                                    value={startDateInput}
-                                    onChange={(e) => setStartDateInput(e.target.value)}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex-1">
-                                <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                                <input
-                                    id="end-date"
-                                    type="date"
-                                    value={endDateInput}
-                                    onChange={(e) => setEndDateInput(e.target.value)}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
-                        </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4 items-center">
+                    <div className="md:col-span-4">
+                        <input
+                            type="text"
+                            placeholder="Search files..."
+                            value={queryInput}
+                            onChange={(e) => setQueryInput(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                     </div>
-                    <div className="flex space-x-4">
-                        <div className="flex-1">
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsFileTypeDropdownOpen(!isFileTypeDropdownOpen)}
-                                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 flex justify-between items-center"
-                                >
-                                    <span>
-                                        {selectedFileTypes.length > 0
-                                            ? `${selectedFileTypes.length} type(s) selected`
-                                            : 'All Types'}
-                                    </span>
-                                    <FiChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isFileTypeDropdownOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {isFileTypeDropdownOpen && (
-                                    <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                        <ul className="py-1">
-                                            {allFileTypes.map(type => (
-                                                <li key={type} className="px-3 py-2 text-gray-700 hover:bg-gray-100 flex justify-start">
-                                                    <label className="flex items-center cursor-pointer ">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedFileTypes.includes(type)}
-                                                            onChange={() => handleFileTypeChange(type)}
-                                                            className="h-4 w-4 mx-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                                        />
-                                                        <span className="capitalize">{type}</span>
-                                                    </label>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-                            </div>
+
+                    {/* Start Date */}
+                    <div className="md:col-span-2">
+                        <input
+                            type="date"
+                            value={startDateInput}
+                            onChange={(e) => setStartDateInput(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    {/* End Date */}
+                    <div className="md:col-span-2">
+                        <input
+                            type="date"
+                            value={endDateInput}
+                            onChange={(e) => setEndDateInput(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    {/* File Type Dropdown */}
+                    <div className="relative inline-block text-left md:col-span-2">
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setIsFileTypeDropdownOpen(!isFileTypeDropdownOpen)}
+                                className="inline-flex justify-center w-full rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 focus:ring-blue-500"
+                            >
+                                {selectedFileTypes.length === 0 ? 'All Types' : `${selectedFileTypes.length} types selected`}
+                                <FiChevronDown className="-mr-1 ml-2 h-5 w-5" />
+                            </button>
                         </div>
+                        {isFileTypeDropdownOpen && (
+                            <div className="origin-top-right absolute right-0 mt-2 w-full rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                <div className="py-1 max-h-60 overflow-y-auto" role="menu" aria-orientation="vertical">
+                                    {allFileTypes.map(fileType => (
+                                        <a
+                                            href="#"
+                                            key={fileType}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                handleFileTypeChange(fileType);
+                                            }}
+                                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                            role="menuitem"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedFileTypes.includes(fileType)}
+                                                readOnly
+                                                className="mr-2 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            {fileType}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bulk Delete Button */}
+                    <div className="md:col-span-2 flex justify-end">
+                        {selectedFiles.length > 0 && (
+                            <button
+                                onClick={handleBulkDelete}
+                                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 flex items-center"
+                            >
+                                <FiTrash2 className="mr-2" />
+                                Delete ({selectedFiles.length})
+                            </button>
+                        )}
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center space-x-4">
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={selectedFiles.length === 0}
-                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                        >
-                            <FiTrash2 className="mr-2" />
-                            Delete Selected ({selectedFiles.length})
-                        </button>
-                    </div>
-                </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
@@ -205,9 +200,6 @@ export const FileList: React.FC = () => {
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Type
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Uploaded By
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Date

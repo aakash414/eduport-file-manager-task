@@ -24,6 +24,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
 from django.contrib.postgres.search import SearchVector, SearchQuery
+from .tasks import process_bulk_upload
+from .utils import invalidate_user_file_cache
 
 from .models import FileUpload
 from .serializers import (
@@ -37,14 +39,7 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 
-def invalidate_user_file_cache(user):
-    version_key = f'user_{user.id}_file_list_version'
-    try:
-        cache.incr(version_key)
-    except ValueError:
-        cache.set(version_key, 2, timeout=None)
-    cache.delete(f'user_{user.id}_file_types')
-    logger.info(f"Invalidated file cache for user {user.id}")
+
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -57,56 +52,21 @@ class BulkFileUploadView(APIView):
         if not files:
             return Response({"error": "No files provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-        successful_uploads = []
-        failed_uploads = []
-
+        files_data = []
         for uploaded_file in files:
-            file_data = {
-                'file': uploaded_file,
-                'original_filename': uploaded_file.name
-            }
-            
-            serializer = FileUploadSerializer(data=file_data, context={'request': request})
-            
-            if serializer.is_valid():
-                try:
-                    serializer.save(uploaded_by=request.user)
-                    successful_uploads.append(serializer.data)
-                except IntegrityError:
-                    failed_uploads.append({
-                        'filename': uploaded_file.name,
-                        'error': 'Duplicate file detected. This exact file already exists.'
-                    })
-                except Exception as e:
-                    logger.error(f"Error saving file {uploaded_file.name}: {str(e)}")
-                    failed_uploads.append({
-                        'filename': uploaded_file.name,
-                        'error': 'An unexpected error occurred during save.'
-                    })
-            else:
-                failed_uploads.append({
-                    'filename': uploaded_file.name,
-                    'error': serializer.errors
-                })
+            # Read file content to pass to Celery task
+            # This ensures the data is JSON-serializable
+            files_data.append({
+                'name': uploaded_file.name,
+                'content': uploaded_file.read(),
+            })
 
-        if successful_uploads:
-            invalidate_user_file_cache(request.user)
-
-        status_code = status.HTTP_207_MULTI_STATUS
-        if not failed_uploads:
-            status_code = status.HTTP_201_CREATED
-            message = 'All files uploaded successfully.'
-        elif not successful_uploads:
-            status_code = status.HTTP_400_BAD_REQUEST
-            message = 'All files failed to upload.'
-        else:
-            message = 'Bulk upload completed with some failures.'
+        # Delegate the processing to the Celery task
+        process_bulk_upload.delay(request.user.id, files_data)
 
         return Response({
-            'message': message,
-            'successful_uploads': successful_uploads,
-            'failed_uploads': failed_uploads
-        }, status=status_code)
+            'message': 'Your files are being processed. They will appear in your file list shortly.',
+        }, status=status.HTTP_202_ACCEPTED)
 
 
 class FileUploadView(generics.CreateAPIView):
@@ -255,32 +215,22 @@ class FileDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class FileDownloadView(generics.RetrieveAPIView):
-    """
-    API endpoint for file downloads.
-    """
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Ensure users can only download their own files."""
         return FileUpload.objects.filter(uploaded_by=self.request.user)
     
     def retrieve(self, request, *args, **kwargs):
-        """
-        Serve file for download with proper headers.
-        """
         try:
             file_upload = self.get_object()
             
-            # Update access tracking
             file_upload.mark_accessed()
             
-            # Log download
             logger.info(
                 f"File downloaded: {file_upload.original_filename} "
                 f"by user {request.user.username}"
             )
             
-            # Serve file
             response = HttpResponse(
                 file_upload.file.read(),
                 content_type='application/octet-stream'
@@ -296,11 +246,6 @@ class FileDownloadView(generics.RetrieveAPIView):
 
 @method_decorator(xframe_options_exempt, name='dispatch')
 class FileContentPreviewView(APIView):
-    """
-    Generate and stream preview content for supported file types.
-    This view returns the raw file content (or a truncated version for text)
-    to be rendered by the browser in the frontend modal.
-    """
     permission_classes = [IsAuthenticated]
 
     PREVIEWABLE_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp']
@@ -390,7 +335,6 @@ class FileContentPreviewView(APIView):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny]) # Should be accessible without auth
 def health_check(request):
-    """Simple health check endpoint to confirm the service is up."""
     return Response({'status': 'ok', 'message': 'Service is healthy.'}, status=status.HTTP_200_OK)
     
     # Also define by MIME type for when it's available
@@ -517,15 +461,6 @@ def bulk_delete_files(request):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def shared_file_download(request, token):
-    """
-    API endpoint for downloading shared files.
-    
-    Interview Talking Points:
-    - Secure file serving without authentication
-    - Token validation
-    - Access tracking
-    - Performance considerations for public access
-    """
     try:
         share_link = get_object_or_404(FileShareLink, token=token)
         
@@ -576,15 +511,6 @@ def shared_file_download(request, token):
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def duplicate_files_cleanup(request):
-    """
-    API endpoint for cleaning up duplicate files.
-    
-    Interview Talking Points:
-    - Database optimization
-    - Bulk operations
-    - User choice in cleanup
-    - Storage management
-    """
     try:
         # Find duplicate files for the user
         user_files = FileUpload.objects.filter(uploaded_by=request.user)
@@ -609,10 +535,8 @@ def duplicate_files_cleanup(request):
                 'duplicates': []
             })
         
-        # Format duplicate information
         duplicate_info = []
         for hash_val, files in actual_duplicates.items():
-            # Sort by upload date (keep oldest)
             files.sort(key=lambda x: x.upload_date)
             original = files[0]
             duplicates = files[1:]
@@ -634,7 +558,6 @@ def duplicate_files_cleanup(request):
                 'potential_savings': sum(dup.file_size for dup in duplicates)
             })
         
-        # If cleanup is requested
         if request.data.get('cleanup', False):
             total_deleted = 0
             total_saved_space = 0
@@ -661,7 +584,6 @@ def duplicate_files_cleanup(request):
                 'space_saved_display': FileListView()._format_file_size(total_saved_space)
             })
         
-        # Return duplicate information for user review
         return Response({
             'message': f'Found {len(actual_duplicates)} sets of duplicate files.',
             'duplicates': duplicate_info,
@@ -681,11 +603,6 @@ def duplicate_files_cleanup(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def file_quick_metadata(request, file_id):
-    """
-    Get lightweight metadata for a file without updating view tracking.
-    Optimized for quick information retrieval and UI tooltips.
-    Complements your existing FileDetailView for different use cases.
-    """
     try:
         file_obj = get_object_or_404(
             FileUpload,
@@ -719,7 +636,6 @@ def file_quick_metadata(request, file_id):
 
 
 def format_file_size(size_bytes):
-    """Format file size in human readable format"""
     if size_bytes == 0:
         return "0 B"
     

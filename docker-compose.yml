@@ -19,6 +19,17 @@ services:
       timeout: 10s
       retries: 3
 
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -29,13 +40,14 @@ services:
       - ./backend:/home/appuser/app
       - media_data:/home/appuser/app/media
       - static_data:/home/appuser/app/static
-
     environment:
       - TZ=Asia/Kolkata
     env_file:
       - .env
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
@@ -48,6 +60,25 @@ services:
       sh -c "python manage.py migrate &&
              python manage.py collectstatic --noinput &&
              gunicorn file_manager.wsgi:application --bind 0.0.0.0:8000 --workers 4 --worker-class gevent --timeout 120"
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/home/appuser/app
+      - media_data:/home/appuser/app/media
+      - static_data:/home/appuser/app/static
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "celery -A file_manager worker -l info"
 
   frontend:
     build:

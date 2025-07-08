@@ -1,4 +1,8 @@
+import logging
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 def user_directory_path(instance, filename):
@@ -27,3 +31,13 @@ def validate_file_type(value):
     ext = value.name.split('.')[-1].lower() if '.' in value.name else ''
     if ext not in allowed_extensions:
         raise ValidationError(f'File type "{ext}" is not allowed')
+
+
+def invalidate_user_file_cache(user):
+    version_key = f'user_{user.id}_file_list_version'
+    try:
+        cache.incr(version_key)
+    except ValueError:
+        cache.set(version_key, 2, timeout=None)
+    cache.delete(f'user_{user.id}_file_types')
+    logger.info(f"Invalidated file cache for user {user.id}")

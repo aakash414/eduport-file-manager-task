@@ -36,12 +36,12 @@ const FileUpload: React.FC = () => {
             <div 
                 {...getRootProps()} 
                 className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-300 ease-in-out
-                ${isDragActive ? 'border-blue-500 bg-blue-50 scale-105' : 'border-gray-300 bg-gray-50 hover:border-gray-400'}`}
+                ${isDragActive ? 'border-blue-500 bg-blue-50 scale-105 shadow-lg' : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'}`}
             >
                 <input {...getInputProps()} />
                 
                 <div className="flex flex-col items-center justify-center space-y-3">
-                    <FiUploadCloud className="w-12 h-12 text-gray-400" />
+                    <FiUploadCloud className={`w-12 h-12 transition-colors duration-300 ${isDragActive ? 'text-blue-500' : 'text-gray-400'}`} />
                     <p className="text-gray-600 font-semibold">
                         {isDragActive ? "Drop files to upload" : "Drag & drop files here"}
                     </p>

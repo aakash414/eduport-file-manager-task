@@ -1,4 +1,3 @@
-// src/hooks/useFiles.tsx
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 import * as fileService from '../services/fileService';
@@ -46,8 +45,11 @@ export const useFiles = () => {
             return;
         }
 
+        setLoading(true);
         try {
-            const response = await api.get<PaginatedResponse<FileUpload>>(url);
+            const relativeUrl = new URL(url).pathname + new URL(url).search;
+
+            const response = await api.get<PaginatedResponse<FileUpload>>(relativeUrl);
             setFileData(response.data);
         } catch (err) {
             console.error('Failed to fetch page:', err);
@@ -90,24 +92,11 @@ export const useFiles = () => {
                 setProgress(percentCompleted);
             });
 
-            setFileData(prev => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    results: [...response.data.successful_uploads, ...prev.results]
-                };
-            });
+            addToast(response.data.message, 'success');
 
-            const { failed_uploads, message } = response.data;
-
-            // Show a summary toast
-            addToast(message, failed_uploads.length > 0 ? 'warning' : 'success');
-
-            // Show specific toasts for failures
-            failed_uploads.forEach((failure: { filename: string; error: any }) => {
-                const errorMessage = getErrorMessage(failure.error);
-                addToast(`Failed: ${failure.filename} - ${errorMessage}`, 'error');
-            });
+            setTimeout(() => {
+                refreshCurrentView();
+            }, 5000);
         } catch (err) {
             addToast('Bulk upload failed.', 'error');
             console.error(err);
@@ -143,18 +132,6 @@ export const useFiles = () => {
             addToast('Failed to delete file.', 'error');
             console.error(err);
         }
-    };
-
-    const getErrorMessage = (error: any): string => {
-        if (typeof error === 'string') {
-            return error;
-        }
-        if (typeof error === 'object' && error !== null) {
-            // This handles serializer errors which are often nested, e.g., { file: ["error message"] }
-            const messages = Object.values(error).flat();
-            return messages.join(' ');
-        }
-        return 'An unknown error occurred.';
     };
 
     // Initial fetch on component mount.
